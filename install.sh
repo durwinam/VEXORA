@@ -22,7 +22,7 @@ command -v python3 >/dev/null || fail "python3 is required."
 
 cat <<'BANNER'
 ╔════════════════════════════════════════════════════════════╗
-║                    VEXORA PRO 4.0.0                       ║
+║                    VEXORA PRO 4.1.0                       ║
 ║        Configuration Shop • Management • SSL              ║
 ╚════════════════════════════════════════════════════════════╝
 BANNER
@@ -32,15 +32,16 @@ echo "Public access mode:"
 echo "  1) Domain + HTTPS (Recommended)"
 echo "  2) IP + HTTPS"
 echo "  3) HTTP :8080"
-read -r -p "Select [1]: " MODE
-MODE="${MODE:-1}"
-[[ "$MODE" =~ ^[123]$ ]] || fail "Invalid mode."
 
-read -r -p "Base path [/ = no path, e.g. /vexora]: " BASE_PATH
-BASE_PATH="${BASE_PATH:-/}"
-[[ "$BASE_PATH" == /* ]] || BASE_PATH="/$BASE_PATH"
-BASE_PATH="/${BASE_PATH#/}"
-if [[ "$BASE_PATH" != "/" ]]; then BASE_PATH="${BASE_PATH%/}/"; fi
+while true; do
+  read -r -p "Select [1-3] (default: 1): " MODE
+  MODE="${MODE//[$' \t\r\n']/}"
+  MODE="${MODE:-1}"
+  case "$MODE" in
+    1|2|3) break ;;
+    *) echo "[ FAIL ] Invalid mode. Please enter 1, 2 or 3." ;;
+  esac
+done
 
 PUBLIC_HOST=""
 PUBLIC_SCHEME="http"
@@ -94,7 +95,7 @@ SECRET="$($APP_DIR/.venv/bin/python -c 'import secrets; print(secrets.token_urls
 COOKIE_SECURE=false
 [[ "$PUBLIC_SCHEME" == "https" ]] && COOKIE_SECURE=true
 cat > "$CONFIG_DIR/.env" <<EOF
-VEXORA_VERSION=4.0.0
+VEXORA_VERSION=4.1.0
 VEXORA_HOST=127.0.0.1
 VEXORA_PORT=$INTERNAL_PORT
 VEXORA_PUBLIC_HOST=$PUBLIC_HOST
@@ -220,7 +221,7 @@ else
 fi
 CRED_FILE="$CONFIG_DIR/INSTALLATION.txt"
 cat > "$CRED_FILE" <<EOF
-VEXORA PRO 4.0.0
+VEXORA PRO 4.1.0
 
 Public URL : $PUBLIC_URL
 Shop       : ${PUBLIC_URL%/}/shop/
@@ -252,19 +253,3 @@ printf '📄 Info   : %s\n' "$CRED_FILE"
 printf '🧩 CLI    : vexora\n'
 printf '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n'
 
-while true; do
-    echo
-    echo "Public access mode:"
-    echo "  1) Domain + HTTPS (Recommended)"
-    echo "  2) IP + HTTPS"
-    echo "  3) HTTP :8080"
-    echo
-    read -r -p "Select [1-3]: " PUBLIC_MODE
-    PUBLIC_MODE="$(printf '%s' "$PUBLIC_MODE" | tr -d '[:space:]')"
-    case "$PUBLIC_MODE" in
-        1) PUBLIC_MODE="domain"; break ;;
-        2) PUBLIC_MODE="ip"; break ;;
-        3) PUBLIC_MODE="http"; break ;;
-        *) echo "[ FAIL ] Invalid mode. Please enter 1, 2 or 3." ;;
-    esac
-done

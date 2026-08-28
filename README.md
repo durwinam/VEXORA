@@ -1,4 +1,4 @@
-# VEXORA PRO 4.0.0
+# VEXORA PRO 4.1.0
 
 A self-hosted, RTL Persian configuration shop and management panel for VPS deployment and source distribution.
 
