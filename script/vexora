@@ -1,1 +1,37 @@
+#!/usr/bin/env python3
+import argparse
+import subprocess
+import urllib.request
 
+SERVICE = "vexora"
+HEALTH = "http://127.0.0.1:6000/health"
+
+def command(*args):
+    return subprocess.call(args)
+
+def main():
+    parser = argparse.ArgumentParser(prog="vexora", description="VEXORA PRO management CLI")
+    sub = parser.add_subparsers(dest="command", required=True)
+    sub.add_parser("health", help="Check application health")
+    sub.add_parser("status", help="Show systemd status")
+    sub.add_parser("logs", help="Show recent logs")
+    sub.add_parser("restart", help="Restart VEXORA")
+    sub.add_parser("version", help="Show version")
+    args = parser.parse_args()
+    if args.command == "health":
+        try:
+            print(urllib.request.urlopen(HEALTH, timeout=5).read().decode())
+        except Exception as exc:
+            print(f"health failed: {exc}")
+            raise SystemExit(1)
+    elif args.command == "status":
+        return command("systemctl", "status", SERVICE, "--no-pager", "-l")
+    elif args.command == "logs":
+        return command("journalctl", "-u", SERVICE, "-n", "100", "--no-pager")
+    elif args.command == "restart":
+        return command("systemctl", "restart", SERVICE)
+    elif args.command == "version":
+        print("VEXORA PRO 4.0.0")
+
+if __name__ == "__main__":
+    main()
