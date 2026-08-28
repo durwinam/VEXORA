@@ -1,0 +1,9 @@
+{% extends 'base.html' %}
+{% block title %}ثبت سفارش | VEXORA{% endblock %}
+{% block content %}
+<main class="container narrow"><div class="page-head"><span class="eyebrow">ORDER</span><h1>ثبت سفارش</h1></div>
+<form class="card form" method="post"><div class="order-summary"><b>{{ plan.name }}</b><span>{{ '{:,.0f}'.format(plan.price) }} تومان</span></div>
+<label>نام / نام کاربری<input name="customer_name" required maxlength="100"></label>
+<label>شماره تماس یا آیدی<input name="customer_contact" maxlength="100"></label>
+<button class="btn primary full" type="submit">ادامه سفارش</button></form></main>
+{% endblock %}
