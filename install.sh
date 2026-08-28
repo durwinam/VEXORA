@@ -142,6 +142,18 @@ python3 -m venv "$APP_DIR/.venv"
 SECRET="$($APP_DIR/.venv/bin/python -c 'import secrets; print(secrets.token_urlsafe(48))')"
 COOKIE_SECURE=false
 [[ "$PUBLIC_SCHEME" == "https" ]] && COOKIE_SECURE=true
+
+# Generate the first admin credentials during installation.
+# The application consumes /opt/vexora/first-login once and removes it after seeding SQLite.
+ADMIN_USERNAME="owner"
+ADMIN_PASSWORD="$($APP_DIR/.venv/bin/python -c 'import secrets; print(secrets.token_urlsafe(18))')"
+cat > "$APP_DIR/first-login" <<EOF
+USERNAME=$ADMIN_USERNAME
+PASSWORD=$ADMIN_PASSWORD
+EOF
+chmod 600 "$APP_DIR/first-login"
+chown vexora:vexora "$APP_DIR/first-login"
+
 cat > "$CONFIG_DIR/.env" <<EOF
 VEXORA_VERSION=4.1.0
 VEXORA_HOST=127.0.0.1
@@ -164,7 +176,6 @@ VEXORA_TELEGRAM_BOT_TOKEN=
 VEXORA_TELEGRAM_CHAT_ID=
 EOF
 chmod 600 "$CONFIG_DIR/.env"
-if [[ -f "$APP_DIR/.env.example" ]]; then cp "$APP_DIR/.env.example" "$CONFIG_DIR/.env.example"; fi
 chown -R vexora:vexora "$APP_DIR" "$DATA_DIR" "$LOG_DIR"
 
 cat > "/etc/systemd/system/$SERVICE.service" <<EOF
@@ -235,44 +246,6 @@ server {
 EOF
       ln -sf /etc/nginx/sites-available/vexora-ssl.conf /etc/nginx/sites-enabled/vexora-ssl.conf
 
-# === VEXORA AUTO ENV GENERATION ===
-ENV_DIR="/etc/vexora"
-ENV_FILE="${ENV_DIR}/.env"
-mkdir -p "$ENV_DIR"
-chmod 700 "$ENV_DIR"
-: "${PUBLIC_MODE:=http}"
-: "${DOMAIN:=}"
-: "${PUBLIC_IP:=}"
-: "${BASE_PATH:=/}"
-: "${PORT:=6000}"
-: "${HOST:=127.0.0.1}"
-: "${ADMIN_USERNAME:=admin}"
-if [[ -z "${ADMIN_PASSWORD:-}" ]]; then
-    ADMIN_PASSWORD="$(python3 -c 'import secrets; print(secrets.token_urlsafe(18))')"
-fi
-if command -v openssl >/dev/null 2>&1; then
-    GENERATED_SECRET="$(openssl rand -hex 32)"
-else
-    GENERATED_SECRET="$(python3 -c 'import secrets; print(secrets.token_hex(32))')"
-fi
-umask 077
-cat > "$ENV_FILE" <<EOF
-VEXORA_VERSION=4.1.0
-VEXORA_HOST=${HOST}
-VEXORA_PORT=${PORT}
-VEXORA_PUBLIC_MODE=${PUBLIC_MODE}
-VEXORA_DOMAIN=${DOMAIN}
-VEXORA_PUBLIC_IP=${PUBLIC_IP}
-VEXORA_BASE_PATH=${BASE_PATH}
-VEXORA_PUBLIC_URL=${PUBLIC_URL:-}
-VEXORA_SECRET_KEY=${GENERATED_SECRET}
-VEXORA_ADMIN_USERNAME=${ADMIN_USERNAME}
-VEXORA_ADMIN_PASSWORD=${ADMIN_PASSWORD}
-VEXORA_ENV_FILE=${ENV_FILE}
-EOF
-chmod 600 "$ENV_FILE"
-echo "[ OK ] Generated configuration: $ENV_FILE"
-# === END VEXORA AUTO ENV GENERATION ===
 
       systemctl enable --now certbot.timer >/dev/null 2>&1 || true
     else
@@ -296,16 +269,19 @@ for _ in {1..20}; do
 done
 $healthy || { journalctl -u "$SERVICE" -n 80 --no-pager; fail "VEXORA did not become healthy."; }
 
-# Retrieve credentials from the first-start log. The application prints them once, then they remain in the journal.
-USERNAME="$(journalctl -u "$SERVICE" --no-pager | sed -n 's/.*VEXORA_FIRST_LOGIN username=\([^ ]*\) password=.*/\1/p' | tail -1)"
-PASSWORD="$(journalctl -u "$SERVICE" --no-pager | sed -n 's/.*VEXORA_FIRST_LOGIN username=[^ ]* password=\([^ ]*\).*/\1/p' | tail -1)"
-USERNAME="${USERNAME:-owner}"
-PASSWORD="${PASSWORD:-See journalctl -u vexora for the first generated password}"
+USERNAME="$ADMIN_USERNAME"
+PASSWORD="$ADMIN_PASSWORD"
 
 if $CERT_OK; then
   PUBLIC_URL="https://$PUBLIC_HOST${BASE_PATH%/}"
 else
   PUBLIC_URL="http://${PUBLIC_HOST:-SERVER-IP}:$HTTP_PORT${BASE_PATH%/}"
+fi
+CERT_FILE="not-issued"
+CERT_PUBLIC_FILE="not-issued"
+if $CERT_OK; then
+  CERT_FILE="/etc/letsencrypt/live/$PUBLIC_HOST/fullchain.pem"
+  CERT_PUBLIC_FILE="/etc/letsencrypt/live/$PUBLIC_HOST/cert.pem"
 fi
 CRED_FILE="$CONFIG_DIR/INSTALLATION.txt"
 cat > "$CRED_FILE" <<EOF
@@ -326,6 +302,8 @@ Service    : $SERVICE
 Internal   : 127.0.0.1:$INTERNAL_PORT
 HTTP       : :$HTTP_PORT
 HTTPS      : :$HTTPS_PORT
+Certificate: ${CERT_FILE:-not-issued}
+Public cert: ${CERT_PUBLIC_FILE:-not-issued}
 EOF
 chmod 600 "$CRED_FILE"
 
@@ -336,6 +314,8 @@ printf '🛒 Shop   : %s/shop/\n' "${PUBLIC_URL%/}"
 printf '🔐 Admin  : %s/admin/\n' "${PUBLIC_URL%/}"
 printf '\n👤 User   : %s\n' "$USERNAME"
 printf '🔑 Pass   : %s\n' "$PASSWORD"
+printf '\n📜 Cert  : %s\n' "$CERT_FILE"
+printf '📜 Public: %s\n' "$CERT_PUBLIC_FILE"
 printf '\n⚙ Config : %s/.env\n' "$CONFIG_DIR"
 printf '📄 Info   : %s\n' "$CRED_FILE"
 printf '🧩 CLI    : vexora\n'
