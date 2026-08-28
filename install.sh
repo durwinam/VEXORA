@@ -234,6 +234,46 @@ server {
 }
 EOF
       ln -sf /etc/nginx/sites-available/vexora-ssl.conf /etc/nginx/sites-enabled/vexora-ssl.conf
+
+# === VEXORA AUTO ENV GENERATION ===
+ENV_DIR="/etc/vexora"
+ENV_FILE="${ENV_DIR}/.env"
+mkdir -p "$ENV_DIR"
+chmod 700 "$ENV_DIR"
+: "${PUBLIC_MODE:=http}"
+: "${DOMAIN:=}"
+: "${PUBLIC_IP:=}"
+: "${BASE_PATH:=/}"
+: "${PORT:=6000}"
+: "${HOST:=127.0.0.1}"
+: "${ADMIN_USERNAME:=admin}"
+if [[ -z "${ADMIN_PASSWORD:-}" ]]; then
+    ADMIN_PASSWORD="$(python3 -c 'import secrets; print(secrets.token_urlsafe(18))')"
+fi
+if command -v openssl >/dev/null 2>&1; then
+    GENERATED_SECRET="$(openssl rand -hex 32)"
+else
+    GENERATED_SECRET="$(python3 -c 'import secrets; print(secrets.token_hex(32))')"
+fi
+umask 077
+cat > "$ENV_FILE" <<EOF
+VEXORA_VERSION=4.1.0
+VEXORA_HOST=${HOST}
+VEXORA_PORT=${PORT}
+VEXORA_PUBLIC_MODE=${PUBLIC_MODE}
+VEXORA_DOMAIN=${DOMAIN}
+VEXORA_PUBLIC_IP=${PUBLIC_IP}
+VEXORA_BASE_PATH=${BASE_PATH}
+VEXORA_PUBLIC_URL=${PUBLIC_URL:-}
+VEXORA_SECRET_KEY=${GENERATED_SECRET}
+VEXORA_ADMIN_USERNAME=${ADMIN_USERNAME}
+VEXORA_ADMIN_PASSWORD=${ADMIN_PASSWORD}
+VEXORA_ENV_FILE=${ENV_FILE}
+EOF
+chmod 600 "$ENV_FILE"
+echo "[ OK ] Generated configuration: $ENV_FILE"
+# === END VEXORA AUTO ENV GENERATION ===
+
       systemctl enable --now certbot.timer >/dev/null 2>&1 || true
     else
       warn "Certificate issuance failed; see /tmp/vexora-cert.log. HTTP :8080 remains available."
