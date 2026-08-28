@@ -1,8 +1,14 @@
-from cryptography.fernet import Fernet
-from .config import settings
-import base64, hashlib
+import base64, hashlib, hmac
+from cryptography.fernet import Fernet, InvalidToken
 
-def key():
-    return base64.urlsafe_b64encode(hashlib.sha256(settings.secret_key.encode()).digest())
-def encrypt(s): return Fernet(key()).encrypt(s.encode()).decode()
-def decrypt(s): return Fernet(key()).decrypt(s.encode()).decode()
+def _key(secret: str) -> bytes:
+    digest = hashlib.sha256(secret.encode()).digest()
+    return base64.urlsafe_b64encode(digest)
+
+def encrypt(secret: str, value: str) -> str:
+    return Fernet(_key(secret)).encrypt(value.encode()).decode()
+
+def decrypt(secret: str, value: str) -> str:
+    if not value: return ''
+    try: return Fernet(_key(secret)).decrypt(value.encode()).decode()
+    except InvalidToken: return ''

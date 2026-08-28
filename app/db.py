@@ -1,41 +1,46 @@
-import sqlite3, os, json
-from pathlib import Path
+import sqlite3
 from contextlib import contextmanager
+from pathlib import Path
 from .config import settings
 
 SCHEMA = '''
-CREATE TABLE IF NOT EXISTS admins(id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT UNIQUE NOT NULL, password_hash TEXT NOT NULL, role TEXT NOT NULL, tenant_id INTEGER, active INTEGER NOT NULL DEFAULT 1, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP);
-CREATE TABLE IF NOT EXISTS tenants(id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, slug TEXT UNIQUE NOT NULL, domain TEXT UNIQUE, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP);
-CREATE TABLE IF NOT EXISTS panels(id INTEGER PRIMARY KEY AUTOINCREMENT, tenant_id INTEGER NOT NULL, name TEXT NOT NULL, kind TEXT NOT NULL, base_url TEXT NOT NULL, username TEXT, secret_enc TEXT, verify_tls INTEGER NOT NULL DEFAULT 1, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP);
-CREATE TABLE IF NOT EXISTS plans(id INTEGER PRIMARY KEY AUTOINCREMENT, tenant_id INTEGER NOT NULL, panel_id INTEGER NOT NULL, name TEXT NOT NULL, price INTEGER NOT NULL, volume_gb REAL NOT NULL, days INTEGER NOT NULL, enabled INTEGER NOT NULL DEFAULT 1);
-CREATE TABLE IF NOT EXISTS customers(id INTEGER PRIMARY KEY AUTOINCREMENT, tenant_id INTEGER NOT NULL, username TEXT, panel_user_id TEXT, plan_id INTEGER, subscription_url TEXT, config_text TEXT, expires_at TEXT, total_bytes INTEGER DEFAULT 0, used_bytes INTEGER DEFAULT 0, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP);
-CREATE TABLE IF NOT EXISTS receipts(id INTEGER PRIMARY KEY AUTOINCREMENT, tenant_id INTEGER NOT NULL, customer_id INTEGER, amount INTEGER NOT NULL, file_path TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'pending', reviewed_by INTEGER, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, reviewed_at TEXT);
-CREATE TABLE IF NOT EXISTS audit_logs(id INTEGER PRIMARY KEY AUTOINCREMENT, actor_admin_id INTEGER, event TEXT NOT NULL, ip TEXT, meta TEXT, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP);
-CREATE TABLE IF NOT EXISTS settings(key TEXT PRIMARY KEY, value TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS admins(id INTEGER PRIMARY KEY, username TEXT UNIQUE NOT NULL, password_hash TEXT NOT NULL, role TEXT NOT NULL DEFAULT 'owner', active INTEGER NOT NULL DEFAULT 1, created_at TEXT DEFAULT CURRENT_TIMESTAMP);
+CREATE TABLE IF NOT EXISTS panels(id INTEGER PRIMARY KEY, name TEXT NOT NULL, kind TEXT NOT NULL, base_url TEXT NOT NULL, username TEXT DEFAULT '', secret_enc TEXT DEFAULT '', verify_tls INTEGER NOT NULL DEFAULT 1, enabled INTEGER NOT NULL DEFAULT 1, created_at TEXT DEFAULT CURRENT_TIMESTAMP);
+CREATE TABLE IF NOT EXISTS plans(id INTEGER PRIMARY KEY, name TEXT NOT NULL, panel_id INTEGER NOT NULL, price INTEGER NOT NULL DEFAULT 0, volume_gb REAL NOT NULL DEFAULT 0, days INTEGER NOT NULL DEFAULT 30, enabled INTEGER NOT NULL DEFAULT 1, created_at TEXT DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY(panel_id) REFERENCES panels(id));
+CREATE TABLE IF NOT EXISTS orders(id INTEGER PRIMARY KEY, plan_id INTEGER NOT NULL, customer_name TEXT NOT NULL, customer_contact TEXT DEFAULT '', status TEXT NOT NULL DEFAULT 'pending', created_at TEXT DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY(plan_id) REFERENCES plans(id));
+CREATE TABLE IF NOT EXISTS receipts(id INTEGER PRIMARY KEY, order_id INTEGER NOT NULL, amount INTEGER NOT NULL, file_path TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'pending', reviewed_by INTEGER, created_at TEXT DEFAULT CURRENT_TIMESTAMP, reviewed_at TEXT, FOREIGN KEY(order_id) REFERENCES orders(id));
+CREATE TABLE IF NOT EXISTS audit(id INTEGER PRIMARY KEY, action TEXT NOT NULL, actor_id INTEGER, detail TEXT DEFAULT '', ip TEXT DEFAULT '', created_at TEXT DEFAULT CURRENT_TIMESTAMP);
 '''
 
-Path(settings.db_path).parent.mkdir(parents=True, exist_ok=True)
 @contextmanager
-def db():
-    con=sqlite3.connect(settings.db_path, timeout=20)
-    con.row_factory=sqlite3.Row
-    con.execute("PRAGMA journal_mode=WAL")
-    con.execute("PRAGMA foreign_keys=ON")
+def connection():
+    settings.data_dir.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(settings.db_path)
+    conn.row_factory = sqlite3.Row
+    conn.execute('PRAGMA foreign_keys=ON')
     try:
-        yield con; con.commit()
-    except: con.rollback(); raise
-    finally: con.close()
+        yield conn
+        conn.commit()
+    finally:
+        conn.close()
 
 def init_db():
-    with db() as c: c.executescript(SCHEMA)
+    with connection() as db:
+        db.executescript(SCHEMA)
 
-def q(sql,args=()):
-    with db() as c: return c.execute(sql,args).fetchall()
-def one(sql,args=()):
-    with db() as c: return c.execute(sql,args).fetchone()
-def exec(sql,args=()):
-    with db() as c:
-        cur=c.execute(sql,args); return cur.lastrowid
+def one(sql, args=()):
+    with connection() as db:
+        row = db.execute(sql, args).fetchone()
+        return dict(row) if row else None
 
-def audit(actor,event,ip,meta=None):
-    exec("INSERT INTO audit_logs(actor_admin_id,event,ip,meta) VALUES(?,?,?,?)",(actor,event,ip,json.dumps(meta or {},ensure_ascii=False)))
+def all_rows(sql, args=()):
+    with connection() as db:
+        return [dict(r) for r in db.execute(sql, args).fetchall()]
+
+def execute(sql, args=()):
+    with connection() as db:
+        cur = db.execute(sql, args)
+        return cur.lastrowid
+
+def audit(action, actor_id=None, detail='', ip=''):
+    execute('INSERT INTO audit(action,actor_id,detail,ip) VALUES(?,?,?,?)', (action, actor_id, detail, ip))
