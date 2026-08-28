@@ -1,131 +1,77 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
-
-REPO='https://github.com/durwinam/VEXORA/archive/refs/heads/main.tar.gz'
-APP='/opt/vexora'
-PORT='6000'
-HOST='0.0.0.0'
-
-red(){ echo -e "\033[31m[ERROR]\033[0m $*" >&2; }
+REPO="https://github.com/durwinam/VEXORA/archive/refs/heads/main.tar.gz"
+APP="/opt/vexora"; INTERNAL="6000"; ACME="/var/www/vexora-acme"
+NGINX="/etc/nginx/sites-available/vexora.conf"
 log(){ echo -e "\033[36m[VEXORA]\033[0m $*"; }
-fail(){ red "$*"; exit 1; }
+die(){ echo -e "\033[31m[ERROR]\033[0m $*" >&2; exit 1; }
+[[ $EUID -eq 0 ]] || die "Run as root."
+command -v curl >/dev/null || die "curl required"; command -v tar >/dev/null || die "tar required"
+T=$(mktemp -d); trap 'rm -rf "$T"' EXIT
+curl -fL --retry 5 --retry-delay 2 "$REPO" -o "$T/v.tar.gz"
+tar -xzf "$T/v.tar.gz" -C "$T"; SRC=$(find "$T" -maxdepth 1 -type d -name 'VEXORA-*' -print -quit)
+[[ -f "$SRC/app/main.py" ]] || die "Invalid VEXORA archive."
 
-[[ $EUID -eq 0 ]] || fail 'Run with sudo.'
-command -v curl >/dev/null || fail 'curl is required.'
-command -v python3 >/dev/null || fail 'python3 is required.'
-command -v tar >/dev/null || fail 'tar is required.'
-
-TMP="$(mktemp -d)"
-trap 'rm -rf "$TMP"' EXIT
-
-log 'Downloading VEXORA source from GitHub...'
-curl -fL --retry 3 --retry-delay 2 "$REPO" -o "$TMP/vexora.tar.gz"
-tar -xzf "$TMP/vexora.tar.gz" -C "$TMP"
-
-SRC="$(find "$TMP" -maxdepth 1 -type d -name 'VEXORA-*' -print -quit)"
-[[ -n "$SRC" ]] || fail 'Repository archive is invalid.'
-[[ -f "$SRC/requirements.txt" ]] || fail 'requirements.txt is missing from the repository.'
-[[ -f "$SRC/app/main.py" ]] || fail 'app/main.py is missing from the repository.'
-
-if command -v apt-get >/dev/null 2>&1; then
-    export DEBIAN_FRONTEND=noninteractive
-    log 'Installing system dependencies...'
-    apt-get update -y
-    apt-get install -y python3 python3-venv python3-pip curl ca-certificates openssl
-fi
-
-log "Installing VEXORA into $APP..."
-mkdir -p "$APP"
-
-# Preserve runtime data and an existing .env during updates.
-if command -v rsync >/dev/null 2>&1; then
-    rsync -a \
-      --exclude '.venv/' \
-      --exclude 'data/' \
-      --exclude 'backups/' \
-      --exclude '.env' \
-      "$SRC/" "$APP/"
+if command -v apt-get >/dev/null; then
+ export DEBIAN_FRONTEND=noninteractive
+ apt-get update -y
+ apt-get install -y python3 python3-venv python3-pip curl ca-certificates openssl nginx
 else
-    find "$SRC" -mindepth 1 -maxdepth 1 ! -name '.env' -exec cp -a {} "$APP/" \;
+ command -v nginx >/dev/null || die "nginx is required."
 fi
 
-mkdir -p "$APP/data" "$APP/backups"
-
-cd "$APP"
-
-if [[ ! -d .venv ]]; then
-    log 'Creating Python virtual environment...'
-    python3 -m venv .venv
+mkdir -p "$APP/data" "$APP/backups" "$ACME/.well-known/acme-challenge"
+if command -v rsync >/dev/null; then
+ rsync -a --delete --exclude '.venv/' --exclude '.certbot/' --exclude 'data/' --exclude 'backups/' --exclude '.env' "$SRC/" "$APP/"
+else
+ find "$SRC" -mindepth 1 -maxdepth 1 ! -name '.env' -exec cp -a {} "$APP/" \;
 fi
+cd "$APP"; python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -q --upgrade pip
+python -m pip install -q -r requirements.txt
 
-source "$APP/.venv/bin/activate"
-python -m pip install --upgrade pip
-python -m pip install -r requirements.txt
+echo "1) Domain + HTTPS [Recommended]"
+echo "2) IP + HTTPS"
+echo "3) HTTP :8080"
+read -r -p "Select [1]: " MODE; MODE=${MODE:-1}
+read -r -p "Path [/vexora/]: " BASE; BASE=${BASE:-/vexora/}
+[[ "$BASE" == /* ]] || BASE="/$BASE"; [[ "$BASE" == */ ]] || BASE="$BASE/"
+read -r -p "Domain or public IP [auto]: " HOST
+HOST=${HOST:-$(curl -4fsS --max-time 5 https://api.ipify.org || hostname -I | awk '{print $1}')}
 
-# Never require .env.example. Generate a valid .env automatically.
-if [[ ! -f "$APP/.env" ]]; then
-    log 'Creating secure environment configuration...'
-    cat > "$APP/.env" <<EOF
-VEXORA_VERSION=1.0.0
-VEXORA_HOST=0.0.0.0
-VEXORA_PORT=6000
-VEXORA_SHOP_PATH=/shop/
-VEXORA_ADMIN_PATH=/admin/
-EOF
-fi
-
-python - <<'PY'
+# Preserve an existing .env but update deployment keys.
+python3 - "$APP/.env" "$BASE" "$HOST" "$MODE" <<'PY'
+import sys,secrets
 from pathlib import Path
-import secrets
-
-p = Path('/opt/vexora/.env')
-data = {}
-
-for line in p.read_text(encoding='utf-8').splitlines():
-    line = line.strip()
-    if line and not line.startswith('#') and '=' in line:
-        k, v = line.split('=', 1)
-        data[k.strip()] = v.strip()
-
-if not data.get('VEXORA_SECRET_KEY') or data['VEXORA_SECRET_KEY'] in {
-    'CHANGE_ME', 'CHANGE_ME_TO_A_LONG_RANDOM_VALUE'
-}:
-    data['VEXORA_SECRET_KEY'] = secrets.token_urlsafe(64)
-
-data.setdefault('VEXORA_VERSION', '1.0.0')
-data['VEXORA_HOST'] = '0.0.0.0'
-data['VEXORA_PORT'] = '6000'
-data.setdefault('VEXORA_SHOP_PATH', '/shop/')
-data.setdefault('VEXORA_ADMIN_PATH', '/admin/')
-
-p.write_text(
-    ''.join(f'{k}={v}\n' for k, v in data.items()),
-    encoding='utf-8'
-)
+p=Path(sys.argv[1]); base=sys.argv[2]; host=sys.argv[3]; mode=sys.argv[4]
+d={}
+if p.exists():
+ for l in p.read_text().splitlines():
+  if '=' in l and not l.lstrip().startswith('#'):
+   k,v=l.split('=',1); d[k]=v
+d.update(VEXORA_VERSION='2.0.0',VEXORA_HOST='127.0.0.1',VEXORA_PORT='6000',
+ VEXORA_BASE_PATH=base,VEXORA_SHOP_PATH=base+'shop/',VEXORA_ADMIN_PATH=base+'admin/',
+ VEXORA_PUBLIC_HOST=host,VEXORA_PUBLIC_PORT='443',
+ VEXORA_PUBLIC_SCHEME='https' if mode in ('1','2') else 'http')
+if not d.get('VEXORA_SECRET_KEY') or d['VEXORA_SECRET_KEY']=='CHANGE_ME': d['VEXORA_SECRET_KEY']=secrets.token_urlsafe(64)
+p.write_text(''.join(f'{k}={v}\n' for k,v in d.items()))
 PY
 
 id vexora >/dev/null 2>&1 || useradd --system --home "$APP" --shell /usr/sbin/nologin vexora
-
-chown -R vexora:vexora "$APP"
-chmod 750 "$APP"
-chmod 700 "$APP/data" "$APP/backups"
-chmod 600 "$APP/.env"
-
+chown -R vexora:vexora "$APP"; chmod 750 "$APP"; chmod 700 "$APP/data" "$APP/backups"; chmod 600 "$APP/.env"
 install -m 0755 "$APP/vexora.py" /usr/local/bin/vexora
-
-cat > /etc/systemd/system/vexora.service <<SERVICE
+cat >/etc/systemd/system/vexora.service <<EOF
 [Unit]
 Description=VEXORA Configuration Shop
 After=network-online.target
 Wants=network-online.target
-
 [Service]
-Type=simple
 User=vexora
 Group=vexora
 WorkingDirectory=$APP
 EnvironmentFile=$APP/.env
-ExecStart=$APP/.venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 6000
+ExecStart=$APP/.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 6000
 Restart=on-failure
 RestartSec=3
 NoNewPrivileges=true
@@ -133,35 +79,103 @@ PrivateTmp=true
 ProtectHome=true
 ProtectSystem=full
 ReadWritePaths=$APP/data $APP/backups
-
 [Install]
 WantedBy=multi-user.target
-SERVICE
+EOF
+systemctl daemon-reload; systemctl enable vexora; systemctl restart vexora
 
-systemctl daemon-reload
-systemctl enable vexora
-systemctl restart vexora
+# Public port: never take over an occupied 443.
+HTTPS=0
+if ! ss -lnt 2>/dev/null | awk '{print $4}' | grep -Eq '(^|:)443$'; then HTTPS=1; fi
+# HTTP challenge/fallback always uses 8080 here; if port 80 is free we add a tiny ACME listener.
+cat >/etc/nginx/sites-available/vexora.conf <<EOF
+server {
+ listen 8080;
+ listen [::]:8080;
+ server_name $HOST _;
+ client_max_body_size 20m;
+ location ^~ /.well-known/acme-challenge/ { root $ACME; }
+ location $BASE {
+  proxy_pass http://127.0.0.1:6000;
+  proxy_http_version 1.1;
+  proxy_set_header Host \$host;
+  proxy_set_header X-Real-IP \$remote_addr;
+  proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+  proxy_set_header X-Forwarded-Proto \$scheme;
+ }
+}
+EOF
+mkdir -p /etc/nginx/sites-enabled
+ln -sf "$NGINX" /etc/nginx/sites-enabled/vexora.conf
+rm -f /etc/nginx/sites-enabled/default 2>/dev/null || true
+# Before certificate exists, only enable the 8080 server.
+if [[ "$HTTPS" == 1 ]]; then
+ sed -i '/server {$/{x;p;x;}' /dev/null 2>/dev/null || true
+fi
+nginx -t && systemctl reload nginx
 
-log 'Checking VEXORA health...'
-HEALTHY=0
-for i in $(seq 1 30); do
-    if curl -fsS --max-time 2 http://127.0.0.1:6000/health >/tmp/vexora-health.json 2>/dev/null; then
-        HEALTHY=1
-        break
-    fi
-    sleep 1
-done
-
-if [[ "$HEALTHY" -ne 1 ]]; then
-    red 'VEXORA did not pass the local health check.'
-    systemctl --no-pager --full status vexora || true
-    journalctl -u vexora -n 100 --no-pager || true
-    exit 1
+# Certbot in an isolated venv; no dependency on old distro certbot.
+CB="$APP/.certbot"; python3 -m venv "$CB"; "$CB/bin/pip" -q install --upgrade pip certbot
+CERTBOT="$CB/bin/certbot"
+# Port 80 is needed for ACME http-01. Create an ACME-only listener if free.
+if ! ss -lnt 2>/dev/null | awk '{print $4}' | grep -Eq '(^|:)80$'; then
+ cat >/etc/nginx/conf.d/vexora-acme.conf <<EOF
+server { listen 80; listen [::]:80; server_name $HOST _; location ^~ /.well-known/acme-challenge/ { root $ACME; } location / { return 404; } }
+EOF
+ nginx -t && systemctl reload nginx
 fi
 
+ISSUED=0
+if [[ "$MODE" == "1" ]]; then
+ if "$CERTBOT" certonly --webroot -w "$ACME" -d "$HOST" --non-interactive --agree-tos --register-unsafely-without-email --keep-until-expiring; then ISSUED=1; fi
+elif [[ "$MODE" == "2" ]]; then
+ if "$CERTBOT" certonly --webroot -w "$ACME" --preferred-profile shortlived --ip-address "$HOST" --non-interactive --agree-tos --register-unsafely-without-email --keep-until-expiring; then ISSUED=1; fi
+fi
+
+# If 443 is free and cert was issued, validate and load TLS server. Otherwise keep 8080.
+if [[ "$HTTPS" == 1 && "$ISSUED" == 1 ]]; then
+ cat >>/etc/nginx/sites-available/vexora.conf <<EOF
+server {
+ listen 443 ssl;
+ listen [::]:443 ssl;
+ server_name $HOST _;
+ ssl_certificate /etc/letsencrypt/live/$HOST/fullchain.pem;
+ ssl_certificate_key /etc/letsencrypt/live/$HOST/privkey.pem;
+ client_max_body_size 20m;
+ location $BASE {
+  proxy_pass http://127.0.0.1:6000;
+  proxy_http_version 1.1;
+  proxy_set_header Host \$host;
+  proxy_set_header X-Real-IP \$remote_addr;
+  proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+  proxy_set_header X-Forwarded-Proto https;
+ }
+}
+EOF
+ nginx -t && systemctl reload nginx
+fi
+cat >/etc/systemd/system/vexora-cert-renew.service <<EOF
+[Unit]
+Description=VEXORA certificate renewal
+[Service]
+Type=oneshot
+ExecStart=$CERTBOT renew --quiet --deploy-hook /usr/sbin/nginx\ -s\ reload
+EOF
+cat >/etc/systemd/system/vexora-cert-renew.timer <<EOF
+[Unit]
+Description=VEXORA certificate renewal timer
+[Timer]
+OnBootSec=15m
+OnUnitActiveSec=6h
+Persistent=true
+[Install]
+WantedBy=timers.target
+EOF
+systemctl daemon-reload; systemctl enable --now vexora-cert-renew.timer
+
+for i in $(seq 1 30); do curl -fsS http://127.0.0.1:6000/health >/tmp/vexora-health.json 2>/dev/null && break; sleep 1; done
+curl -fsS http://127.0.0.1:6000/health >/dev/null || { journalctl -u vexora -n 100 --no-pager; exit 1; }
 echo
-log 'Installation completed successfully.'
-log 'Shop:  http://SERVER-IP:6000/shop/'
-log 'Admin: http://SERVER-IP:6000/admin/'
-log 'CLI:   vexora'
-cat /tmp/vexora-health.json
+log "Internal: http://127.0.0.1:6000"
+if [[ "$ISSUED" == 1 && "$HTTPS" == 1 ]]; then log "Public: https://$HOST$BASE"; else log "Public fallback: http://$HOST:8080$BASE"; fi
+log "CLI: vexora"

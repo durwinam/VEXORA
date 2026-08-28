@@ -1,26 +1,26 @@
 #!/usr/bin/env python3
 import argparse, os, subprocess, sys
-from pathlib import Path
-
+def run(c): return subprocess.run(c,check=False)
 def main():
- p=argparse.ArgumentParser(prog='vexora'); sub=p.add_subparsers(dest='cmd')
- sub.add_parser('version'); sub.add_parser('status'); sub.add_parser('health'); sub.add_parser('test')
- sub.add_parser('restart'); sub.add_parser('update'); sub.add_parser('remove')
- x=sub.add_parser('backup'); x.add_argument('--send',action='store_true')
- a=sub.add_parser('passwd'); a.add_argument('username',nargs='?')
- ns=sub.parse_args()
- if ns.cmd=='version': print('VEXORA 1.0.0'); return
- if ns.cmd=='status': subprocess.run(['systemctl','status','vexora','--no-pager']); return
- if ns.cmd=='health': subprocess.run(['curl','-fsS','http://127.0.0.1:6000/health']); print(); return
- if ns.cmd=='test':
-  subprocess.run(['curl','-fsS','http://127.0.0.1:6000/health']); print('\nHealth test complete'); return
- if ns.cmd=='restart': subprocess.run(['systemctl','restart','vexora']); return
- if ns.cmd=='update': print('Use the GitHub installer/update process to update safely.'); return
- if ns.cmd=='remove':
-  if os.geteuid()!=0: print('root required'); sys.exit(1)
-  subprocess.run(['systemctl','disable','--now','vexora'],check=False); print('Service stopped; data was preserved.')
-  return
- if ns.cmd=='backup':
-  sys.path.insert(0,'/opt/vexora'); from app.backup import make_backup; print(make_backup()); return
- p.print_help()
-if __name__=='__main__': main()
+ p=argparse.ArgumentParser(prog="vexora"); s=p.add_subparsers(dest="cmd",required=True)
+ for x in ("version","status","health","test","security","info","restart","update","remove","backup"): s.add_parser(x)
+ a=p.parse_args()
+ if a.cmd=="version": print("VEXORA 2.0.0")
+ elif a.cmd=="status": run(["systemctl","status","vexora","--no-pager"])
+ elif a.cmd=="health": run(["curl","-fsS","http://127.0.0.1:6000/health"])
+ elif a.cmd=="test":
+  print("=== health ==="); run(["curl","-fsS","http://127.0.0.1:6000/health"]); print("\n=== ports ==="); run(["bash","-lc","ss -lntp | grep -E ':(443|8080|6000)\\b' || true"])
+ elif a.cmd=="security": run(["bash","-lc","systemctl is-enabled vexora; systemctl is-active vexora; stat -c '%a %n' /opt/vexora/.env 2>/dev/null || true"])
+ elif a.cmd=="info":
+  p="/opt/vexora/.env"
+  if os.path.exists(p):
+   for l in open(p):
+    if l.startswith(("VEXORA_VERSION=","VEXORA_HOST=","VEXORA_PORT=","VEXORA_BASE_PATH=","VEXORA_PUBLIC_HOST=","VEXORA_PUBLIC_PORT=")): print(l.strip())
+ elif a.cmd=="restart": run(["systemctl","restart","vexora"])
+ elif a.cmd=="update": print("Use the GitHub installer; .env/data/backups are preserved.")
+ elif a.cmd=="remove":
+  if os.geteuid()!=0: sys.exit("root required")
+  run(["systemctl","disable","--now","vexora"]); print("Service stopped; data preserved.")
+ elif a.cmd=="backup":
+  sys.path.insert(0,"/opt/vexora"); from app.backup import make_backup; print(make_backup())
+if __name__=="__main__": main()
