@@ -1,8 +1,11 @@
-import os, tempfile
-os.environ['VEXORA_SECRET_KEY']='test-secret-key-123456789'
-from app.security import hash_password, verify_password, make_session, read_session
+import os
+os.environ['VEXORA_DATA_DIR']='/tmp/vexora-test-data'
+os.environ['VEXORA_CONFIG_DIR']='/tmp/vexora-test-config'
+os.environ['VEXORA_LOG_DIR']='/tmp/vexora-test-log'
+from app.security import generate_secret, make_token, read_token
 
-def test_password():
- h=hash_password('StrongPassword!123'); assert verify_password('StrongPassword!123',h); assert not verify_password('bad',h)
-def test_session():
- t=make_session('test-secret-key-123456789',7); assert read_session('test-secret-key-123456789',t)['admin_id']==7
+def test_token_roundtrip():
+    secret=generate_secret()
+    token=make_token(secret, 42, 1)
+    data=read_token(secret, token)
+    assert data and data['admin_id']==42
