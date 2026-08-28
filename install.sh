@@ -164,7 +164,7 @@ VEXORA_TELEGRAM_BOT_TOKEN=
 VEXORA_TELEGRAM_CHAT_ID=
 EOF
 chmod 600 "$CONFIG_DIR/.env"
-cp "$APP_DIR/.env.example" "$CONFIG_DIR/.env.example"
+if [[ -f "$APP_DIR/.env.example" ]]; then cp "$APP_DIR/.env.example" "$CONFIG_DIR/.env.example"; fi
 chown -R vexora:vexora "$APP_DIR" "$DATA_DIR" "$LOG_DIR"
 
 cat > "/etc/systemd/system/$SERVICE.service" <<EOF
