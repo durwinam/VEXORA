@@ -21,12 +21,23 @@ def startup():
         # Installer normally supplies this. Development mode gets a local secret.
         settings.secret_key=generate_secret()
     if one('SELECT id FROM admins LIMIT 1') is None:
-        username, password = generate_credentials()
+        credential_file = Path('/opt/vexora/first-login')
+        username = password = None
+        if credential_file.exists():
+            values = {}
+            for line in credential_file.read_text(encoding='utf-8').splitlines():
+                if '=' in line:
+                    key, value = line.split('=', 1)
+                    values[key.strip()] = value.strip()
+            username = values.get('USERNAME')
+            password = values.get('PASSWORD')
+            credential_file.unlink(missing_ok=True)
+        if not username or not password:
+            username, password = generate_credentials()
         execute(
             'INSERT INTO admins(username,password_hash,role) VALUES(?,?,?)',
             (username, hash_password(password), 'owner'),
         )
-        print(f'VEXORA FIRST LOGIN username={username} password={password}')
 
 @app.get(settings.health_path)
 def health():

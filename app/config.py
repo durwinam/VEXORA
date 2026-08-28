@@ -5,7 +5,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file='.env', env_file_encoding='utf-8', extra='ignore')
-    version: str = Field('3.0.0', validation_alias='VEXORA_VERSION')
+    version: str = Field('4.1.0', validation_alias='VEXORA_VERSION')
     host: str = Field('127.0.0.1', validation_alias='VEXORA_HOST')
     port: int = Field(6000, validation_alias='VEXORA_PORT', ge=1, le=65535)
     public_host: str = Field('', validation_alias='VEXORA_PUBLIC_HOST')
