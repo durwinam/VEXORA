@@ -1,78 +1,11 @@
-DURWINAM ATTRIBUTION LICENSE
+BSD 3-Clause License
 
 Copyright (c) 2026 durwinam
-Original Project: durwinam
+All rights reserved.
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to use,
-copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
-the Software, subject to the following conditions:
+Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:
+1. Redistributions of source code must retain the above copyright notice, this list of conditions and the following disclaimer.
+2. Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the following disclaimer in the documentation and/or other materials provided with the distribution.
+3. Neither the name of the copyright holder nor the names of its contributors may be used to endorse or promote products derived from this software without specific prior written permission.
 
-1. Attribution Requirement
-
-Any copy, fork, modified version, derivative work, redistribution, or
-publication of this Software must retain the original copyright notice,
-author attribution, and project attribution.
-
-The following attribution must remain present:
-
-Copyright (c) 2026 durwinam
-Original Project: durwinam
-
-The attribution may not be removed, hidden, replaced, or modified in a way
-that falsely represents another person or organization as the original author
-or creator of the Software.
-
-2. Modified Versions
-
-You are free to modify, improve, customize, or extend the Software.
-
-Modified versions may be distributed publicly or privately, provided that the
-original copyright and attribution notices remain intact.
-
-If you publish a modified version, you must clearly indicate that the version
-has been modified and is not the original unmodified release.
-
-3. Commercial Use
-
-Commercial use of the Software is permitted.
-
-You may use the Software as part of a commercial product or service, provided
-that the original copyright and attribution requirements of this license are
-preserved.
-
-4. Copying and Redistribution
-
-Copying, forking, mirroring, and redistribution of the Software are permitted.
-
-Any redistributed copy must include a copy of this license and must retain the
-original copyright and author attribution.
-
-5. No Claim of Original Authorship
-
-Redistributing, modifying, or using this Software does not grant permission
-to claim that you are the original author or creator of the Software.
-
-You may identify yourself as the author of your own modifications, but the
-original authorship and attribution to durwinam must remain clearly
-identifiable.
-
-6. Warranty Disclaimer
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
-
-IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
-DAMAGES, OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT, OR
-OTHERWISE, ARISING FROM, OUT OF, OR IN CONNECTION WITH THE SOFTWARE OR THE
-USE OR OTHER DEALINGS IN THE SOFTWARE.
-
----
-
-Required Attribution
-
-© 2026 durwinam — Original Project
-
-This attribution must remain included in any copy, fork, redistribution,
-or modified version of this project.
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES ARE DISCLAIMED.
