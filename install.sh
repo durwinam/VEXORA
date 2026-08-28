@@ -251,3 +251,20 @@ printf '\n⚙ Config : %s/.env\n' "$CONFIG_DIR"
 printf '📄 Info   : %s\n' "$CRED_FILE"
 printf '🧩 CLI    : vexora\n'
 printf '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n'
+
+while true; do
+    echo
+    echo "Public access mode:"
+    echo "  1) Domain + HTTPS (Recommended)"
+    echo "  2) IP + HTTPS"
+    echo "  3) HTTP :8080"
+    echo
+    read -r -p "Select [1-3]: " PUBLIC_MODE
+    PUBLIC_MODE="$(printf '%s' "$PUBLIC_MODE" | tr -d '[:space:]')"
+    case "$PUBLIC_MODE" in
+        1) PUBLIC_MODE="domain"; break ;;
+        2) PUBLIC_MODE="ip"; break ;;
+        3) PUBLIC_MODE="http"; break ;;
+        *) echo "[ FAIL ] Invalid mode. Please enter 1, 2 or 3." ;;
+    esac
+done
