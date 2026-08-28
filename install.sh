@@ -32,31 +32,79 @@ echo "Public access mode:"
 echo "  1) Domain + HTTPS (Recommended)"
 echo "  2) IP + HTTPS"
 echo "  3) HTTP :8080"
-
+echo
 while true; do
-  read -r -p "Select [1-3] (default: 1): " MODE
-  MODE="${MODE//[$' \t\r\n']/}"
-  MODE="${MODE:-1}"
+  read -r -p "Select [1-3]: " MODE
+  MODE="$(printf '%s' "$MODE" | tr -d '[:space:]')"
   case "$MODE" in
     1|2|3) break ;;
     *) echo "[ FAIL ] Invalid mode. Please enter 1, 2 or 3." ;;
   esac
 done
 
+echo
+read -r -p "Base path [/ = no path, e.g. /vexora]: " BASE_PATH
+BASE_PATH="${BASE_PATH:-/}"
+[[ "$BASE_PATH" == /* ]] || BASE_PATH="/$BASE_PATH"
+BASE_PATH="/${BASE_PATH#/}"
+if [[ "$BASE_PATH" != "/" ]]; then BASE_PATH="${BASE_PATH%/}/"; fi
+
 PUBLIC_HOST=""
 PUBLIC_SCHEME="http"
 PUBLIC_PORT="$HTTP_PORT"
 
+is_valid_domain() {
+  local d="$1"
+  [[ -n "$d" && ${#d} -le 253 ]] || return 1
+  [[ "$d" != .* && "$d" != *. ]] || return 1
+  [[ "$d" != *..* ]] || return 1
+  [[ "$d" =~ ^[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?$ ]] || return 1
+  local label
+  IFS='.' read -ra labels <<< "$d"
+  ((${#labels[@]} >= 2)) || return 1
+  for label in "${labels[@]}"; do
+    [[ "$label" =~ ^[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?$ ]] || return 1
+    ((${#label} <= 63)) || return 1
+  done
+}
+
+is_valid_ipv4() {
+  local ip="$1" part
+  local -a parts
+  IFS='.' read -ra parts <<< "$ip"
+  ((${#parts[@]} == 4)) || return 1
+  for part in "${parts[@]}"; do
+    [[ "$part" =~ ^[0-9]{1,3}$ ]] || return 1
+    ((10#$part <= 255)) || return 1
+  done
+}
+
 case "$MODE" in
   1)
-    read -r -p "Domain: " PUBLIC_HOST
-    [[ "$PUBLIC_HOST" =~ ^[A-Za-z0-9.-]+$ ]] || fail "Invalid domain."
-    PUBLIC_SCHEME="https"; PUBLIC_PORT="$HTTPS_PORT" ;;
+    while true; do
+      echo
+      read -r -p "Enter your domain (example: panel.example.com): " PUBLIC_HOST
+      PUBLIC_HOST="$(printf '%s' "$PUBLIC_HOST" | tr -d '[:space:]')"
+      if is_valid_domain "$PUBLIC_HOST"; then break; fi
+      echo "[ FAIL ] Invalid domain. Enter a real domain such as panel.example.com."
+    done
+    PUBLIC_SCHEME="https"
+    PUBLIC_PORT="$HTTPS_PORT"
+    ;;
   2)
-    read -r -p "Public IPv4: " PUBLIC_HOST
-    [[ "$PUBLIC_HOST" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]] || fail "Invalid IPv4."
-    PUBLIC_SCHEME="https"; PUBLIC_PORT="$HTTPS_PORT" ;;
-  3) : ;;
+    while true; do
+      echo
+      read -r -p "Enter your public IPv4 address: " PUBLIC_HOST
+      PUBLIC_HOST="$(printf '%s' "$PUBLIC_HOST" | tr -d '[:space:]')"
+      if is_valid_ipv4 "$PUBLIC_HOST"; then break; fi
+      echo "[ FAIL ] Invalid IPv4. Enter an address such as 185.226.92.105."
+    done
+    PUBLIC_SCHEME="https"
+    PUBLIC_PORT="$HTTPS_PORT"
+    ;;
+  3)
+    :
+    ;;
 esac
 
 SHOP_PATH="/shop/"
