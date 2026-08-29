@@ -14,7 +14,7 @@ Self-hosted RTL Persian configuration shop and management panel for VPS deployme
 - Panel registry with encrypted credentials and connectivity check
 - Signed admin sessions with bcrypt password hashing
 - Login rate limiting
-- Nginx reverse proxy with FastAPI bound only to `127.0.0.1:6000`
+- Nginx reverse proxy with FastAPI bound to `0.0.0.0:6000`
 - HTTP on `8080` and HTTPS on `443` when a valid certificate is available
 - Let's Encrypt/Certbot certificate issuance and renewal hook
 - Domain certificates and supported IP certificates
@@ -57,7 +57,15 @@ vexora uninstall
 ```
 
 ## Security model
-The application is intentionally bound to `127.0.0.1:6000`. Nginx is the public entry point. Passwords are bcrypt-hashed, sessions are signed, login attempts are rate limited, uploads are size/type checked, and secrets are stored outside the web root.
+The application listens on `0.0.0.0:6000` for direct backend access; Nginx remains the public entry point for HTTP/HTTPS. Passwords are bcrypt-hashed, sessions are signed, login attempts are rate limited, uploads are size/type checked, and secrets are stored outside the web root.
 
 ## Certificates
 Domain certificates use Let's Encrypt HTTP-01 through Certbot. IP address certificates require a recent Certbot release that supports the short-lived IP profile. If HTTPS cannot be activated, VEXORA remains available on HTTP `:8080` and the installer reports the exact certificate status instead of pretending HTTPS succeeded.
+
+## Network model
+
+VEXORA listens on `0.0.0.0:6000`, while the installer firewall policy blocks public TCP/6000. Public access is provided through Nginx on TCP/443 and TCP/8080.
+
+Fixed routes:
+- `/shop/` — customer storefront
+- `/admin/` — administration

@@ -35,7 +35,16 @@ else
   tar -xzf "$TMP/v.tar.gz" -C "$TMP"
   SRC="$TMP/VEXORA-main"
 fi
-[[ -f "$SRC/app/main.py" && -f "$SRC/requirements.txt" ]] || fail 'Incomplete VEXORA source.'
+# The repository has historically used both `script/` and `scripts/`.
+# Normalize either layout so an older GitHub checkout cannot break installation.
+if [[ ! -d "$SRC/scripts" && -d "$SRC/script" ]]; then
+  cp -a "$SRC/script" "$SRC/scripts"
+fi
+[[ -f "$SRC/app/main.py" && -f "$SRC/requirements.txt" ]] || fail 'Incomplete VEXORA source: missing app/main.py or requirements.txt.'
+REQUIRED_SOURCE_FILES=(scripts/backup.sh scripts/update.sh scripts/uninstall.sh scripts/restore.sh scripts/vexora scripts/health-check.sh systemd/vexora-backup.service systemd/vexora-backup.timer)
+for rel in "${REQUIRED_SOURCE_FILES[@]}"; do
+  [[ -f "$SRC/$rel" ]] || fail "Incomplete VEXORA source: missing $rel."
+done
 # Never delete the installer source when it is being executed from the app directory.
 if [[ "$SRC" != "$APP_DIR" ]]; then
   rm -rf "$APP_DIR"
@@ -46,11 +55,11 @@ fi
 cp -a "$SRC/." "$APP_DIR/"; rm -rf "$APP_DIR/.venv" "$APP_DIR/app/__pycache__" "$APP_DIR/app/routes/__pycache__" "$APP_DIR/app/services/__pycache__"; find "$APP_DIR" -name '*.pyc' -delete
 python3 -m venv "$APP_DIR/.venv"; "$APP_DIR/.venv/bin/pip" install -q --upgrade pip wheel; "$APP_DIR/.venv/bin/pip" install -q -r "$APP_DIR/requirements.txt"
 SECRET=$($APP_DIR/.venv/bin/python -c 'import secrets; print(secrets.token_urlsafe(48))'); ADMIN_USER=owner; ADMIN_PASS=$($APP_DIR/.venv/bin/python -c 'import secrets; print(secrets.token_urlsafe(18))'); COOKIE_SECURE=false; [[ $SCHEME == https ]] && COOKIE_SECURE=true
-printf 'USERNAME=%s\nPASSWORD=%s\n' "$ADMIN_USER" "$ADMIN_PASS" > "$APP_DIR/first-login"; chmod 600 "$APP_DIR/first-login"; chown vexora:vexora "$APP_DIR/first-login"
+printf 'USERNAME=%s\nPASSWORD=%s\n' "$ADMIN_USER" "$ADMIN_PASS" > "$CONFIG_DIR/first-login"; chmod 600 "$CONFIG_DIR/first-login"; chown vexora:vexora "$CONFIG_DIR/first-login"
 cat > "$CONFIG_DIR/.env" <<EOF
 # VEXORA Configuration — version ${VERSION}
 VEXORA_VERSION=${VERSION}
-VEXORA_HOST=127.0.0.1
+VEXORA_HOST=0.0.0.0
 VEXORA_PORT=${INTERNAL_PORT}
 VEXORA_PUBLIC_HOST=${PUBLIC_HOST}
 VEXORA_PUBLIC_PORT=${PUBLIC_PORT}
@@ -89,7 +98,7 @@ User=vexora
 Group=vexora
 WorkingDirectory=$APP_DIR
 EnvironmentFile=$CONFIG_DIR/.env
-ExecStart=$APP_DIR/.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port $INTERNAL_PORT --proxy-headers --forwarded-allow-ips=127.0.0.1
+ExecStart=$APP_DIR/.venv/bin/uvicorn app.main:app --host 0.0.0.0 --port $INTERNAL_PORT --proxy-headers --forwarded-allow-ips=127.0.0.1
 Restart=always
 RestartSec=3
 NoNewPrivileges=true
@@ -113,23 +122,39 @@ server {
 EOF
 ln -sf /etc/nginx/sites-available/vexora.conf /etc/nginx/sites-enabled/vexora.conf
 systemctl daemon-reload; systemctl enable --now vexora; nginx -t; systemctl enable --now nginx; systemctl reload nginx
-CERT_OK=false; HTTPS_ACTIVE=false; CERT_FILE=''; KEY_FILE=''
+CERT_OK=false; HTTPS_ACTIVE=false; CERT_FILE=''; KEY_FILE=''; PORT80_AVAILABLE=true
 if [[ $MODE == 1 || $MODE == 2 ]]; then
- info 'Installing Certbot...'; apt-get install -y -qq certbot >/dev/null || warn 'Certbot installation failed.'
- if command -v certbot >/dev/null && ! ss -lnt 2>/dev/null | awk '{print $4}' | grep -Eq '(^|:)80$'; then
-  cat > /etc/nginx/sites-available/vexora-acme.conf <<EOF
+  info 'Installing Certbot...'; apt-get install -y -qq certbot >/dev/null || warn 'Certbot installation failed.'
+  if ! command -v certbot >/dev/null; then
+    warn 'Certbot is unavailable; HTTPS remains disabled.'
+  else
+    PORT80_OWNER=$(ss -lntp 2>/dev/null | awk '$4 ~ /(^|:)80$/ {print $NF}' | head -n1 || true)
+    PORT80_OK=false
+    if [[ -z "$PORT80_OWNER" ]]; then
+      PORT80_OK=true
+    elif systemctl is-active --quiet nginx && [[ "$PORT80_OWNER" == *nginx* ]]; then
+      PORT80_OK=true
+    else
+      warn "Port 80 is occupied by another service ($PORT80_OWNER); ACME HTTP-01 cannot run."
+      PORT80_AVAILABLE=false
+    fi
+    if $PORT80_OK; then
+      cat > /etc/nginx/sites-available/vexora-acme.conf <<EOF
 server { listen 80; listen [::]:80; server_name ${PUBLIC_HOST}; location /.well-known/acme-challenge/ { root /var/www/vexora-acme; } location / { return 404; } }
 EOF
-  ln -sf /etc/nginx/sites-available/vexora-acme.conf /etc/nginx/sites-enabled/vexora-acme.conf; nginx -t && systemctl reload nginx
-  if [[ $MODE == 1 ]]; then
-    if certbot certonly --webroot -w /var/www/vexora-acme --non-interactive --agree-tos --register-unsafely-without-email --keep-until-expiring --cert-name "$PUBLIC_HOST" -d "$PUBLIC_HOST" >/tmp/vexora-cert.log 2>&1; then CERT_OK=true; else warn 'Domain certificate issuance failed; see /tmp/vexora-cert.log.'; fi
-  else
-    CERTBOT_OK=false
-    if certbot --version 2>&1 | awk '{print $2}' | awk -F. '{exit !($1>5 || ($1==5 && $2>=4))}'; then
-      if certbot certonly --webroot -w /var/www/vexora-acme --non-interactive --agree-tos --register-unsafely-without-email --keep-until-expiring --preferred-profile shortlived --cert-name "$PUBLIC_HOST" --ip-address "$PUBLIC_HOST" >/tmp/vexora-cert.log 2>&1; then CERT_OK=true; else warn 'IP certificate issuance failed; see /tmp/vexora-cert.log.'; fi
-    else warn 'Certbot 5.4+ is required for IP certificates.'; fi
+      ln -sf /etc/nginx/sites-available/vexora-acme.conf /etc/nginx/sites-enabled/vexora-acme.conf
+      nginx -t && systemctl reload nginx
+      if [[ $MODE == 1 ]]; then
+        if certbot certonly --webroot -w /var/www/vexora-acme --non-interactive --agree-tos --register-unsafely-without-email --keep-until-expiring --cert-name "$PUBLIC_HOST" -d "$PUBLIC_HOST" >/tmp/vexora-cert.log 2>&1; then CERT_OK=true; else warn 'Domain certificate issuance failed; see /tmp/vexora-cert.log.'; fi
+      else
+        if certbot --version 2>&1 | awk '{print $2}' | awk -F. '{exit !($1>5 || ($1==5 && $2>=4))}'; then
+          if certbot certonly --webroot -w /var/www/vexora-acme --non-interactive --agree-tos --register-unsafely-without-email --keep-until-expiring --preferred-profile shortlived --cert-name "$PUBLIC_HOST" --ip-address "$PUBLIC_HOST" >/tmp/vexora-cert.log 2>&1; then CERT_OK=true; else warn 'IP certificate issuance failed; see /tmp/vexora-cert.log.'; fi
+        else
+          warn 'Certbot 5.4+ is required for IP certificates.'
+        fi
+      fi
+    fi
   fi
- else warn 'Port 80 is unavailable; ACME HTTP-01 cannot run.'; fi
 fi
 if $CERT_OK; then CERT_FILE="/etc/letsencrypt/live/$PUBLIC_HOST/fullchain.pem"; KEY_FILE="/etc/letsencrypt/live/$PUBLIC_HOST/privkey.pem"; [[ -f "$CERT_FILE" && -f "$KEY_FILE" ]] || CERT_OK=false; fi
 if $CERT_OK && ! ss -lnt 2>/dev/null | awk '{print $4}' | grep -Eq '(^|:)443$'; then
@@ -150,6 +175,11 @@ cat > /etc/letsencrypt/renewal-hooks/deploy/vexora-nginx-reload.sh <<'EOF'
 systemctl reload nginx
 EOF
 chmod 755 /etc/letsencrypt/renewal-hooks/deploy/vexora-nginx-reload.sh
+REQUIRED_SCRIPTS=(backup.sh update.sh uninstall.sh restore.sh vexora health-check.sh)
+for helper in "${REQUIRED_SCRIPTS[@]}"; do
+  [[ -f "$APP_DIR/scripts/$helper" ]] || fail "VEXORA source is missing scripts/$helper. Upload the complete project to GitHub before using the one-line installer."
+done
+[[ -f "$APP_DIR/systemd/vexora-backup.service" && -f "$APP_DIR/systemd/vexora-backup.timer" ]] || fail 'VEXORA source is missing backup systemd units.'
 cp "$APP_DIR/scripts/backup.sh" "$APP_DIR/scripts/update.sh" "$APP_DIR/scripts/uninstall.sh" "$APP_DIR/scripts/restore.sh" /usr/local/lib/vexora/
 cp "$APP_DIR/scripts/vexora" /usr/local/bin/vexora; chmod 755 /usr/local/bin/vexora
 cp "$APP_DIR/systemd/vexora-backup.service" /etc/systemd/system/vexora-backup.service; cp "$APP_DIR/systemd/vexora-backup.timer" /etc/systemd/system/vexora-backup.timer
@@ -167,10 +197,10 @@ CERT_STATUS=$([[ "$HTTPS_ACTIVE" == true ]] && echo active || echo not-issued)
 KEY=${KEY_FILE:-not-issued}
 EOF
 chmod 600 "$CONFIG_DIR/INSTALLATION.txt"
-rm -f "$APP_DIR/first-login"
+rm -f "$CONFIG_DIR/first-login"
 sleep 2
-if ! curl -fsS --max-time 8 -H "Host: $PUBLIC_HOST" http://127.0.0.1:${HTTP_PORT}/shop/ >/dev/null
-if ! curl -fsS --max-time 8 -H "Host: $PUBLIC_HOST" http://127.0.0.1:${HTTP_PORT}/static/css/app.css >/dev/null; then fail 'Nginx public static route check failed.'; fi; then fail 'Nginx public HTTP route check failed.'; fi
+if ! curl -fsS --max-time 8 -H "Host: $PUBLIC_HOST" http://127.0.0.1:${HTTP_PORT}/shop/ >/dev/null; then fail 'Nginx public HTTP route check failed.'; fi
+if ! curl -fsS --max-time 8 -H "Host: $PUBLIC_HOST" http://127.0.0.1:${HTTP_PORT}/static/css/app.css >/dev/null; then fail 'Nginx public static route check failed.'; fi
 if $HTTPS_ACTIVE; then curl -kfsS --max-time 8 -H "Host: $PUBLIC_HOST" https://127.0.0.1:${HTTPS_PORT}/shop/ >/dev/null || fail 'Nginx public HTTPS route check failed.'; fi
 if ! "$APP_DIR/scripts/health-check.sh"; then journalctl -u vexora -n 80 --no-pager; fail 'Installation failed health checks.'; fi
 ok 'Installation completed successfully.'
