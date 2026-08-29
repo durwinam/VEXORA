@@ -1,0 +1,15 @@
+css/app.css
+fonts/DejaVuSans.ttf
+fonts/NotoKufiArabic-Bold.ttf
+fonts/NotoKufiArabic-Regular.ttf
+icons/dashboard.svg
+icons/server.svg
+icons/settings.svg
+icons/shield.svg
+icons/shop.svg
+img/icon-bolt.svg
+img/icon-cart.svg
+img/icon-gear.svg
+img/icon-lock.svg
+js/app.js
+js/ui.js
