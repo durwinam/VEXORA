@@ -1,0 +1,21 @@
+#!/usr/bin/env python3
+import argparse,subprocess,urllib.request,sys
+SERVICE='vexora'; HEALTH='http://127.0.0.1:6000/health'; VERSION='1.0.0'
+def call(*a):return subprocess.call(a)
+def main():
+ p=argparse.ArgumentParser(prog='vexora',description='VEXORA 1.0.0 management CLI');s=p.add_subparsers(dest='command',required=True)
+ for n in ('start','stop','restart','status','logs','health','version','backup','restore','update','uninstall'):s.add_parser(n)
+ a=p.parse_args()
+ if a.command=='health':
+  try:print(urllib.request.urlopen(HEALTH,timeout=5).read().decode());return 0
+  except Exception as e:print(f'health failed: {e}');return 1
+ if a.command=='version':print(f'VEXORA {VERSION}');return 0
+ if a.command=='backup':return call('/usr/local/lib/vexora/backup.sh')
+ if a.command=='restore':
+  pth=input('Backup ZIP path: ').strip(); return call('/usr/local/lib/vexora/restore.sh',pth)
+ if a.command=='update':return call('/usr/local/lib/vexora/update.sh')
+ if a.command=='uninstall':return call('/usr/local/lib/vexora/uninstall.sh')
+ if a.command=='status':return call('systemctl','status',SERVICE,'--no-pager','-l')
+ if a.command=='logs':return call('journalctl','-u',SERVICE,'-n','100','--no-pager')
+ return call('systemctl',a.command,SERVICE)
+if __name__=='__main__':sys.exit(main() or 0)
