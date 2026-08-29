@@ -1,7 +1,0 @@
-[Unit]
-Description=VEXORA automatic backup
-After=vexora.service
-[Service]
-Type=oneshot
-ExecStart=/usr/local/lib/vexora/backup.sh
-User=root
