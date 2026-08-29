@@ -5,6 +5,9 @@ APP=/opt/vexora; TMP=$(mktemp -d); trap 'rm -rf "$TMP"' EXIT
 tar -czf "$TMP/source-before-update.tar.gz" --exclude='.venv' --exclude='*.db' --exclude='first-login' -C "$APP" .
 curl -fsSL --retry 4 https://github.com/durwinam/VEXORA/archive/refs/heads/main.tar.gz -o "$TMP/v.tar.gz"
 tar -xzf "$TMP/v.tar.gz" -C "$TMP"; SRC="$TMP/VEXORA-main"; test -f "$SRC/app/main.py"
+for rel in scripts/backup.sh scripts/update.sh scripts/uninstall.sh scripts/restore.sh scripts/vexora scripts/health-check.sh systemd/vexora-backup.service systemd/vexora-backup.timer; do
+  test -f "$SRC/$rel" || { echo "[ FAIL ] Update source is incomplete: missing $rel" >&2; exit 1; }
+done
 rsync -a --delete --exclude '.venv/' --exclude '*.db' --exclude 'first-login' "$SRC/" "$APP/"
 if ! "$APP/.venv/bin/pip" install -q -r "$APP/requirements.txt" || ! systemctl restart vexora || ! sleep 2 || ! "$APP/scripts/health-check.sh"; then
   echo '[ WARN ] Update health check failed; restoring previous source.' >&2
