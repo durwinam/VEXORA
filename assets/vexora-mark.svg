@@ -1,1 +1,33 @@
-
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 800" role="img" aria-labelledby="title desc">
+  <title id="title">VEXORA mark</title>
+  <desc id="desc">Purple futuristic VEXORA emblem</desc>
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="42%" r="65%">
+      <stop offset="0" stop-color="#24164a"/>
+      <stop offset="0.58" stop-color="#0e1220"/>
+      <stop offset="1" stop-color="#070a11"/>
+    </radialGradient>
+    <linearGradient id="v" x1="15%" y1="5%" x2="85%" y2="100%">
+      <stop offset="0" stop-color="#ddd6fe"/>
+      <stop offset="0.42" stop-color="#a78bfa"/>
+      <stop offset="1" stop-color="#6d3fe0"/>
+    </linearGradient>
+    <filter id="glow" x="-80%" y="-80%" width="260%" height="260%">
+      <feGaussianBlur stdDeviation="20" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <circle cx="400" cy="400" r="355" fill="url(#bg)" stroke="#ffffff" stroke-opacity=".08" stroke-width="2"/>
+  <g fill="none" stroke="#a78bfa" stroke-opacity=".16">
+    <ellipse cx="400" cy="400" rx="315" ry="135" transform="rotate(-18 400 400)" stroke-width="2"/>
+    <ellipse cx="400" cy="400" rx="355" ry="170" transform="rotate(31 400 400)" stroke-width="2"/>
+    <circle cx="400" cy="400" r="230" stroke-dasharray="8 18"/>
+  </g>
+  <g filter="url(#glow)">
+    <path d="M220 205 L400 590 L580 205 L492 205 L400 420 L308 205 Z" fill="url(#v)"/>
+  </g>
+  <path d="M246 222 L400 548 L554 222" fill="none" stroke="#fff" stroke-opacity=".42" stroke-width="5"/>
+  <g fill="#c4b5fd">
+    <circle cx="150" cy="360" r="4"/><circle cx="646" cy="315" r="5"/><circle cx="602" cy="570" r="3"/><circle cx="200" cy="560" r="3"/>
+  </g>
+</svg>
