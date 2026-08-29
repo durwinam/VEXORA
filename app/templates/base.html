@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="theme-color" content="#090b11">
   <title>{% block title %}VEXORA{% endblock %}</title>
-  <link rel="stylesheet" href="/static/css/app.css">
+  <link rel="stylesheet" href="{{ settings.static_path }}css/app.css">
 </head>
 <body>
 <header class="topbar">
@@ -17,7 +17,8 @@
 </header>
 {% block content %}{% endblock %}
 <footer><div class="container footer-row"><span>© {{ settings.version }} · durwinam</span><span>VEXORA Configuration Shop</span></div></footer>
-<script src="/static/js/app.js"></script>
+<script>window.VEXORA_STATIC_PATH={{ settings.static_path|tojson }};</script>
+<script src="{{ settings.static_path }}js/app.js"></script>
 {% block scripts %}{% endblock %}
 </body>
 </html>
