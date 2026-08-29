@@ -1,1 +1,119 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
 
+<head>
+    <meta charset="utf-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1"
+    >
+
+    <title>VEXORA — فروشگاه</title>
+
+    <link
+        rel="stylesheet"
+        href="/static/css/app.css"
+    >
+</head>
+
+<body class="shop-page">
+
+    <header class="topbar">
+
+        <div class="brand">
+            <span class="brand-mark">V</span>
+            <span>VEXORA</span>
+        </div>
+
+        <a
+            class="ghost-button"
+            href="/admin/"
+        >
+            مدیریت
+        </a>
+
+    </header>
+
+    <main>
+
+        <section class="hero">
+
+            <div class="hero-copy">
+
+                <span class="eyebrow">
+                    CONFIGURATION SHOP
+                </span>
+
+                <h1>
+                    سرویس خودت را
+                    <strong>ساده و سریع</strong>
+                    تهیه کن.
+                </h1>
+
+                <p>
+                    یک فروشگاه مدرن برای ارائه
+                    سرویس‌های VEXORA.
+                </p>
+
+            </div>
+
+        </section>
+
+        <section class="products-section">
+
+            <div class="section-heading">
+                <span>محصولات</span>
+                <h2>پلن‌های موجود</h2>
+            </div>
+
+            <div class="product-grid">
+
+                {% for product in products %}
+
+                <article class="product-card">
+
+                    <div class="product-icon">
+                        ✦
+                    </div>
+
+                    <h3>
+                        {{ product["name"] }}
+                    </h3>
+
+                    <p>
+                        {{ product["description"] }}
+                    </p>
+
+                    <div class="price">
+                        {{ "{:,}".format(product["price"]) }}
+                        <small>تومان</small>
+                    </div>
+
+                    <button class="primary-button">
+                        خرید
+                    </button>
+
+                </article>
+
+                {% else %}
+
+                <div class="empty-state">
+                    هنوز محصولی اضافه نشده است.
+                </div>
+
+                {% endfor %}
+
+            </div>
+
+        </section>
+
+    </main>
+
+    <footer class="footer">
+        VEXORA 1.0.0
+    </footer>
+
+</body>
+
+</html>
