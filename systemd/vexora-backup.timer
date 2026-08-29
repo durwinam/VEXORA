@@ -1,8 +1,0 @@
-[Unit]
-Description=Daily VEXORA backup
-[Timer]
-OnCalendar=*-*-* 03:00:00
-Persistent=true
-RandomizedDelaySec=10m
-[Install]
-WantedBy=timers.target
