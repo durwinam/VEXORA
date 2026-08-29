@@ -1,7 +1,6 @@
-VEXORA_VERSION="1.0.0"
 #!/usr/bin/env bash
 
-set -euo pipefail
+set -Eeuo pipefail
 
 VERSION="1.0.0"
 INSTALL_DIR="/opt/vexora"
@@ -20,9 +19,42 @@ root_check() {
     command -v apt-get >/dev/null || fail "Debian/Ubuntu is required."
 }
 
-source_dir() {
-    cd "$(dirname "$0")"
-    pwd
+find_source_root() {
+    local script_dir candidate
+    script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+
+    for candidate in \
+        "${script_dir}" \
+        "${script_dir}/VEXORA-1.0.0" \
+        "${script_dir}/VEXORA-1.0.0-COMMERCIAL" \
+        "${script_dir}/VEXORA-1.0.0-PRO" \
+        "${INSTALL_DIR}"; do
+        if [[ -d "${candidate}/app" && -f "${candidate}/requirements.txt" ]]; then
+            printf '%s\n' "${candidate}"
+            return 0
+        fi
+    done
+
+    candidate="$(find "${script_dir}" -maxdepth 4 -type f -path '*/app/main.py' -print -quit 2>/dev/null || true)"
+    if [[ -n "${candidate}" ]]; then
+        dirname "$(dirname "${candidate}")"
+        return 0
+    fi
+
+    fail "Incomplete VEXORA source: app/ is missing. Extract the complete VEXORA 1.0.0 project before running install.sh."
+}
+
+validate_source() {
+    local src="$1"
+    [[ -d "${src}/app" ]] || fail "Incomplete VEXORA source: app/ is missing."
+    [[ -f "${src}/app/main.py" ]] || fail "Incomplete VEXORA source: app/main.py is missing."
+    [[ -f "${src}/requirements.txt" ]] || fail "requirements.txt is missing."
+    [[ -d "${src}/scripts" ]] || fail "Incomplete VEXORA source: scripts/ is missing."
+
+    for required_script in backup.sh restore.sh uninstall.sh update.sh health-check.sh diagnose.sh; do
+        [[ -f "${src}/scripts/${required_script}" ]] || \
+            fail "Incomplete VEXORA source: scripts/${required_script} is missing."
+    done
 }
 
 packages() {
@@ -38,17 +70,11 @@ packages() {
         curl \
         ca-certificates \
         openssl \
-        sqlite3
+        sqlite3 \
+        iproute2
 }
 
 prepare() {
-    local src
-    src="$(source_dir)"
-
-    [[ -d "${src}/app" ]] || fail "Incomplete VEXORA source: app/ is missing."
-    [[ -f "${src}/requirements.txt" ]] || fail "requirements.txt is missing."
-    [[ -d "${src}/scripts" ]] || fail "Incomplete VEXORA source: scripts/ is missing."
-
     install -d -m 0755 "${INSTALL_DIR}"
     install -d -m 0750 "${CONFIG_DIR}"
     install -d -m 0750 "${DATA_DIR}"
@@ -84,6 +110,7 @@ PY
 import hashlib
 import secrets
 import sys
+
 password = sys.argv[1]
 salt = secrets.token_hex(16)
 digest = hashlib.pbkdf2_hmac(
@@ -97,46 +124,11 @@ PY
 )"
 }
 
-write_env() {
-    cat > "${CONFIG_DIR}/.env" <<EOF2
-VEXORA_VERSION=${VERSION}
-VEXORA_APP_NAME=VEXORA
-VEXORA_HOST=0.0.0.0
-VEXORA_PORT=${BACKEND_PORT}
-VEXORA_PUBLIC_URL=${PUBLIC_URL}
-VEXORA_SECRET_KEY=${SECRET_KEY}
-VEXORA_ADMIN_USERNAME=owner
-VEXORA_ADMIN_PASSWORD_HASH=${ADMIN_HASH}
-VEXORA_DATABASE=${DATA_DIR}/vexora.db
-VEXORA_CERT_FILE=${CERT_DIR}/fullchain.pem
-VEXORA_KEY_FILE=${CERT_DIR}/privkey.pem
-VEXORA_SESSION_DAYS=2
-VEXORA_LOG_LEVEL=INFO
-EOF2
-
-    chmod 0600 "${CONFIG_DIR}/.env"
-}
-
-install_source() {
-    local src
-    src="$(source_dir)"
-
-    rm -rf "${INSTALL_DIR}/app" "${INSTALL_DIR}/scripts"
-    cp -a "${src}/app" "${INSTALL_DIR}/app"
-    cp -a "${src}/scripts" "${INSTALL_DIR}/scripts"
-    cp "${src}/requirements.txt" "${INSTALL_DIR}/requirements.txt"
-
-    python3 -m venv "${INSTALL_DIR}/.venv"
-
-    "${INSTALL_DIR}/.venv/bin/pip" install \
-        --disable-pip-version-check \
-        --no-cache-dir \
-        -r "${INSTALL_DIR}/requirements.txt"
-
-    chown -R vexora:vexora "${INSTALL_DIR}"
-}
-
 identity() {
+    echo
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo "        VEXORA ${VERSION} — SSL SETUP"
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
     echo
     echo "1) Domain"
     echo "2) Public IPv4"
@@ -160,34 +152,93 @@ identity() {
     esac
 }
 
+write_env() {
+    cat > "${CONFIG_DIR}/.env" <<EOF2
+VEXORA_VERSION=${VERSION}
+VEXORA_APP_NAME=VEXORA
+VEXORA_HOST=0.0.0.0
+VEXORA_PORT=${BACKEND_PORT}
+VEXORA_PUBLIC_URL=${PUBLIC_URL}
+VEXORA_SECRET_KEY=${SECRET_KEY}
+VEXORA_ADMIN_USERNAME=owner
+VEXORA_ADMIN_PASSWORD_HASH=${ADMIN_HASH}
+VEXORA_DATABASE=${DATA_DIR}/vexora.db
+VEXORA_CERT_FILE=${CERT_DIR}/fullchain.pem
+VEXORA_KEY_FILE=${CERT_DIR}/privkey.pem
+VEXORA_SESSION_DAYS=2
+VEXORA_LOG_LEVEL=INFO
+EOF2
+    chmod 0600 "${CONFIG_DIR}/.env"
+}
+
+install_source() {
+    local src="$1"
+
+    rm -rf "${INSTALL_DIR}/app" "${INSTALL_DIR}/scripts"
+    cp -a "${src}/app" "${INSTALL_DIR}/app"
+    cp -a "${src}/scripts" "${INSTALL_DIR}/scripts"
+    cp "${src}/requirements.txt" "${INSTALL_DIR}/requirements.txt"
+
+    python3 -m venv "${INSTALL_DIR}/.venv"
+    "${INSTALL_DIR}/.venv/bin/pip" install \
+        --disable-pip-version-check \
+        --no-cache-dir \
+        -r "${INSTALL_DIR}/requirements.txt"
+
+    chown -R vexora:vexora "${INSTALL_DIR}"
+}
+
+certbot_bin() {
+    if [[ -x /snap/bin/certbot ]]; then
+        printf '%s\n' /snap/bin/certbot
+    else
+        command -v certbot
+    fi
+}
+
+ensure_ip_certbot() {
+    local current major minor
+    current="$(certbot --version 2>&1 | awk '{print $2}')"
+    major="${current%%.*}"
+    minor="${current#*.}"
+    minor="${minor%%.*}"
+
+    if [[ "${major}" =~ ^[0-9]+$ && "${minor}" =~ ^[0-9]+$ ]] && \
+       (( major > 5 || (major == 5 && minor >= 4) )); then
+        return
+    fi
+
+    info "Installed Certbot is too old for IP certificates; installing current Certbot via snap..."
+    apt-get install -y snapd
+    systemctl enable --now snapd.socket || true
+    snap install core >/dev/null 2>&1 || true
+    snap refresh core >/dev/null 2>&1 || true
+    snap install --classic certbot >/dev/null 2>&1 || true
+    [[ -x /snap/bin/certbot ]] || fail "Certbot 5.4+ is required for IP certificates and could not be installed."
+}
+
 certificate() {
-    info "Obtaining mandatory Let's Encrypt certificate..."
+    local bin live_dir
+    info "Obtaining mandatory TLS certificate..."
 
     systemctl stop nginx 2>/dev/null || true
+    command -v certbot >/dev/null || fail "Certbot is not installed."
+
+    if [[ "${IDENTITY_MODE}" == "2" ]]; then
+        ensure_ip_certbot
+    fi
+
+    bin="$(certbot_bin)"
 
     if [[ "${IDENTITY_MODE}" == "1" ]]; then
-        certbot certonly \
+        "${bin}" certonly \
             --standalone \
             --non-interactive \
             --agree-tos \
             --register-unsafely-without-email \
             -d "${CERT_ID}" || fail "Domain certificate issuance failed."
     else
-        local version
-        version="$(certbot --version 2>&1 | awk '{print $2}')"
-
-        python3 - "${version}" <<'PY' || fail "Certbot 5.4+ is required for IP certificates."
-import sys
-parts = []
-for item in sys.argv[1].split('.')[:3]:
-    digits = ''.join(c for c in item if c.isdigit())
-    parts.append(int(digits or 0))
-while len(parts) < 3:
-    parts.append(0)
-raise SystemExit(0 if tuple(parts) >= (5, 4, 0) else 1)
-PY
-
-        certbot certonly \
+        "${bin}" certonly \
             --standalone \
             --non-interactive \
             --agree-tos \
@@ -196,49 +247,43 @@ PY
             --ip-address "${CERT_ID}" || fail "IP certificate issuance failed."
     fi
 
-    CERT_LIVE_DIR="/etc/letsencrypt/live/${CERT_ID}"
+    live_dir="/etc/letsencrypt/live/${CERT_ID}"
+    [[ -s "${live_dir}/fullchain.pem" ]] || fail "Certificate file missing."
+    [[ -s "${live_dir}/privkey.pem" ]] || fail "Private key missing."
 
-    [[ -s "${CERT_LIVE_DIR}/fullchain.pem" ]] || fail "Certificate file missing."
-    [[ -s "${CERT_LIVE_DIR}/privkey.pem" ]] || fail "Private key missing."
-
-    install -m 0644 "${CERT_LIVE_DIR}/fullchain.pem" "${CERT_DIR}/fullchain.pem"
-    install -m 0600 "${CERT_LIVE_DIR}/privkey.pem" "${CERT_DIR}/privkey.pem"
+    install -m 0644 "${live_dir}/fullchain.pem" "${CERT_DIR}/fullchain.pem"
+    install -m 0600 "${live_dir}/privkey.pem" "${CERT_DIR}/privkey.pem"
 }
 
 alternate_port() {
-    for port in 8443 9443 10443 2053 2083 2087 2096; do
+    local port
+    for port in 8443 9443 10443 2053 2083 2087 2096 2443 3443; do
         if ! ss -lnt | grep -qE ":${port}[[:space:]]"; then
             ALT_HTTPS_PORT="${port}"
             return
         fi
     done
-
     fail "No free HTTPS alternative port found."
 }
 
 nginx_config() {
-    local src
-    src="$(source_dir)"
+    local src="$1" server_name
+    server_name="${CERT_ID}"
 
     sed \
-        -e "s/listen 8443 ssl/listen ${ALT_HTTPS_PORT} ssl/" \
-        -e "s/listen \[::\]:8443 ssl/listen [::]:${ALT_HTTPS_PORT} ssl/" \
+        -e "s/__SERVER_NAME__/${server_name}/g" \
+        -e "s/__ALT_HTTPS_PORT__/${ALT_HTTPS_PORT}/g" \
         "${src}/nginx/vexora.conf" \
         > /etc/nginx/sites-available/vexora.conf
 
     rm -f /etc/nginx/sites-enabled/default
-
-    ln -sf \
-        /etc/nginx/sites-available/vexora.conf \
-        /etc/nginx/sites-enabled/vexora.conf
+    ln -sf /etc/nginx/sites-available/vexora.conf /etc/nginx/sites-enabled/vexora.conf
 
     nginx -t || fail "Nginx configuration test failed."
 }
 
 service_config() {
-    local src
-    src="$(source_dir)"
-
+    local src="$1"
     install -m 0644 \
         "${src}/systemd/vexora.service" \
         /etc/systemd/system/vexora.service
@@ -261,14 +306,10 @@ start_backend() {
     systemctl enable vexora
     systemctl restart vexora
 
-    for _ in $(seq 1 25); do
-        if curl \
-            --fail \
-            --silent \
-            --show-error \
-            --max-time 2 \
-            "http://127.0.0.1:${BACKEND_PORT}/health" \
-            >/dev/null; then
+    for _ in $(seq 1 30); do
+        if curl --fail --silent --show-error --max-time 2 \
+            "http://127.0.0.1:${BACKEND_PORT}/health" >/dev/null; then
+            ok "Backend health check passed."
             return
         fi
         sleep 1
@@ -285,23 +326,20 @@ start_nginx() {
 }
 
 public_check() {
-    curl \
-        --fail \
-        --silent \
-        --show-error \
-        --max-time 15 \
+    curl --fail --silent --show-error --max-time 15 \
         --resolve "${CERT_ID}:443:127.0.0.1" \
-        "https://${CERT_ID}/shop/" \
-        >/dev/null || fail "Public HTTPS shop check failed."
+        "https://${CERT_ID}/shop/" >/dev/null || \
+        fail "Nginx public HTTPS shop route failed."
 
-    curl \
-        --fail \
-        --silent \
-        --show-error \
-        --max-time 15 \
+    curl --fail --silent --show-error --max-time 15 \
         --resolve "${CERT_ID}:${ALT_HTTPS_PORT}:127.0.0.1" \
-        "https://${CERT_ID}:${ALT_HTTPS_PORT}/shop/" \
-        >/dev/null || fail "Alternative HTTPS shop check failed."
+        "https://${CERT_ID}:${ALT_HTTPS_PORT}/shop/" >/dev/null || \
+        fail "Nginx alternative HTTPS shop route failed."
+
+    curl --fail --silent --show-error --max-time 10 \
+        --resolve "${CERT_ID}:443:127.0.0.1" \
+        "https://${CERT_ID}/admin/login" >/dev/null || \
+        fail "Nginx public HTTPS admin route failed."
 }
 
 report() {
@@ -321,29 +359,32 @@ Pass   : ${ADMIN_PASSWORD}
 Cert   : ${CERT_DIR}/fullchain.pem
 Config : ${CONFIG_DIR}/.env
 EOF2
-
     chmod 0600 "${CONFIG_DIR}/INSTALLATION.txt"
 }
 
 main() {
+    local src
     root_check
+    src="$(find_source_root)"
+    validate_source "${src}"
     packages
     prepare
     generate_credentials
     identity
     alternate_port
+    install_source "${src}"
     write_env
-    install_source
     database
     certificate
-    service_config
-    nginx_config
+    service_config "${src}"
+    nginx_config "${src}"
     start_backend
     start_nginx
     public_check
     report
 
     ok "Installation completed successfully."
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
     echo "Public : ${PUBLIC_URL}"
     echo "Shop   : ${PUBLIC_URL}/shop/"
     echo "Admin  : ${PUBLIC_URL}/admin/"
@@ -351,9 +392,8 @@ main() {
     echo "HTTPS2 : ${ALT_HTTPS_PORT}"
     echo "User   : owner"
     echo "Pass   : ${ADMIN_PASSWORD}"
+    echo "Backend: 0.0.0.0:${BACKEND_PORT}"
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 }
 
 main "$@"
-
-# SSL target selection
-source "$SOURCE_ROOT/scripts/ssl-setup.sh"
