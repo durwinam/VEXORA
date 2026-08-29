@@ -1,1 +1,97 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
 
+<head>
+    <meta charset="utf-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1"
+    >
+
+    <title>ورود مدیریت — VEXORA</title>
+
+    <link
+        rel="stylesheet"
+        href="/static/css/app.css"
+    >
+</head>
+
+<body class="auth-page">
+
+    <main class="auth-shell">
+
+        <section class="auth-card">
+
+            <div class="brand auth-brand">
+                <span class="brand-mark">V</span>
+                <span>VEXORA</span>
+            </div>
+
+            <span class="eyebrow">
+                ADMINISTRATION
+            </span>
+
+            <h1>
+                ورود به پنل مدیریت
+            </h1>
+
+            <p class="muted">
+                برای ادامه، اطلاعات مدیر را وارد کنید.
+            </p>
+
+            {% if error %}
+            <div class="alert">
+                {{ error }}
+            </div>
+            {% endif %}
+
+            <form
+                method="post"
+                action="/admin/login"
+            >
+
+                <label>
+                    نام کاربری
+
+                    <input
+                        name="username"
+                        autocomplete="username"
+                        required
+                    >
+                </label>
+
+                <label>
+                    رمز عبور
+
+                    <input
+                        type="password"
+                        name="password"
+                        autocomplete="current-password"
+                        required
+                    >
+                </label>
+
+                <button
+                    class="primary-button full"
+                    type="submit"
+                >
+                    ورود به پنل
+                </button>
+
+            </form>
+
+            <a
+                class="back-link"
+                href="/shop/"
+            >
+                بازگشت به فروشگاه
+            </a>
+
+        </section>
+
+    </main>
+
+</body>
+
+</html>
