@@ -1,3 +1,0 @@
-{% extends 'base.html' %}
-{% block title %}ورود مدیریت | VEXORA{% endblock %}
-{% block content %}<main class="container narrow auth"><div class="auth-card card"><div class="brand-big"><span class="brand-icon">V</span><b>VEXORA</b></div><h1>ورود مدیریت</h1>{% if request.query_params.get('error') %}<div class="alert">نام کاربری یا رمز عبور نادرست است.</div>{% endif %}<form class="form" method="post" action="{{ settings.path('admin/login') }}"><label>نام کاربری<input name="username" autocomplete="username" required></label><label>رمز عبور<input type="password" name="password" autocomplete="current-password" required></label><button class="btn primary full">ورود امن</button></form></div></main>{% endblock %}
