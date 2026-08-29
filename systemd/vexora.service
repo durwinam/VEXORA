@@ -1,12 +1,23 @@
 [Unit]
 Description=VEXORA Configuration Shop
-After=network.target
+After=network-online.target
+Wants=network-online.target
+
 [Service]
 Type=simple
+User=vexora
+Group=vexora
+
 WorkingDirectory=/opt/vexora
 EnvironmentFile=/etc/vexora/.env
-ExecStart=/opt/vexora/.venv/bin/uvicorn app.main:app --host ${VEXORA_HOST} --port ${VEXORA_PORT} --proxy-headers --forwarded-allow-ips=127.0.0.1
+
+ExecStart=/opt/vexora/.venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 6000 --proxy-headers --forwarded-allow-ips=127.0.0.1
+
 Restart=on-failure
 RestartSec=3
+
+NoNewPrivileges=true
+PrivateTmp=true
+
 [Install]
 WantedBy=multi-user.target
