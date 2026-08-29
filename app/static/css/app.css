@@ -4,17 +4,17 @@
 @media(max-width:760px){nav{display:none}.hero{padding:65px 0}.hero h1{font-size:43px}.stats{grid-template-columns:repeat(2,1fr)}.grid-2,.admin-links{grid-template-columns:1fr}.info-grid{grid-template-columns:repeat(2,1fr)}.section-title,.page-head{align-items:flex-start;flex-direction:column}.footer-row{flex-direction:column;justify-content:center;gap:5px}}
 
 
-/* VEXORA 4.1 — Local typography and icon system */
+/* VEXORA 1.0 — Local typography and icon system */
 @font-face {
     font-family: "VEXORA Kufi";
-    src: url("/static/fonts/NotoKufiArabic-Regular.ttf") format("truetype");
+    src: url("../fonts/NotoKufiArabic-Regular.ttf") format("truetype");
     font-weight: 400;
     font-style: normal;
     font-display: swap;
 }
 @font-face {
     font-family: "VEXORA Kufi";
-    src: url("/static/fonts/NotoKufiArabic-Bold.ttf") format("truetype");
+    src: url("../fonts/NotoKufiArabic-Bold.ttf") format("truetype");
     font-weight: 700;
     font-style: normal;
     font-display: swap;
