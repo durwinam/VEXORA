@@ -5,7 +5,7 @@ After=network.target
 Type=simple
 WorkingDirectory=/opt/vexora
 EnvironmentFile=/etc/vexora/.env
-ExecStart=/opt/vexora/.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 6000 --proxy-headers --forwarded-allow-ips=127.0.0.1
+ExecStart=/opt/vexora/.venv/bin/uvicorn app.main:app --host ${VEXORA_HOST} --port ${VEXORA_PORT} --proxy-headers --forwarded-allow-ips=127.0.0.1
 Restart=on-failure
 RestartSec=3
 [Install]
