@@ -8,7 +8,7 @@
             img.className = className;
             img.alt = "";
             img.setAttribute("aria-hidden", "true");
-            img.src = `/static/icons/${encodeURIComponent(name)}.svg`;
+            img.src = `${window.VEXORA_STATIC_PATH || "/static/"}icons/${encodeURIComponent(name)}.svg`;
             return img;
         },
 
