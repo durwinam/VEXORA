@@ -1,0 +1,118 @@
+.vexora-toast {
+    position: fixed;
+    z-index: 9999;
+    right: 24px;
+    bottom: 24px;
+    max-width: min(360px, calc(100vw - 48px));
+    padding: 13px 16px;
+    border: 1px solid rgba(255,255,255,.10);
+    border-radius: 13px;
+    background: rgba(15,20,31,.95);
+    box-shadow: 0 20px 55px rgba(0,0,0,.35);
+    color: #fff;
+    font-size: 12px;
+    opacity: 0;
+    transform: translateY(10px);
+    transition: .25s ease;
+}
+
+.vexora-toast.is-visible {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.vexora-toast-success {
+    border-color: rgba(52,211,153,.25);
+}
+
+.vexora-toast-error {
+    border-color: rgba(251,113,133,.25);
+}
+
+.vexora-toast-info {
+    border-color: rgba(139,92,246,.25);
+}
+
+.admin-search {
+    width: min(330px, 100%);
+    min-height: 42px;
+    padding-inline: 13px;
+}
+
+.data-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 16px 20px;
+    border-bottom: 1px solid rgba(255,255,255,.06);
+}
+
+.data-toolbar-group {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.data-toolbar-label {
+    color: #8993a6;
+    font-size: 10px;
+}
+
+.soft-button {
+    min-height: 38px;
+    padding: 0 12px;
+    border: 1px solid rgba(255,255,255,.08);
+    border-radius: 10px;
+    background: rgba(255,255,255,.025);
+    color: #d8dce5;
+    font-size: 10px;
+}
+
+.soft-button:hover {
+    border-color: rgba(139,92,246,.25);
+    background: rgba(139,92,246,.07);
+}
+
+.kpi-caption {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    color: #657084;
+    font-size: 8px;
+}
+
+.kpi-caption.positive {
+    color: #6ee7b7;
+}
+
+.kpi-caption.negative {
+    color: #fda4af;
+}
+
+.empty-panel {
+    display: grid;
+    min-height: 240px;
+    place-items: center;
+    padding: 30px;
+    color: #8993a6;
+    text-align: center;
+}
+
+.empty-panel strong {
+    display: block;
+    margin-bottom: 6px;
+    color: #d8dce5;
+}
+
+@media (max-width: 700px) {
+    .data-toolbar {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .admin-search {
+        width: 100%;
+    }
+}
