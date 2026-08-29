@@ -16,7 +16,7 @@ def startup():
     init_db()
     if not settings.secret_key: settings.secret_key=generate_secret()
     if one('SELECT id FROM admins LIMIT 1') is None:
-        f=Path('/opt/vexora/first-login'); values={}
+        f=Path('/etc/vexora/first-login'); values={}
         if f.exists():
             for line in f.read_text(encoding='utf-8').splitlines():
                 if '=' in line:

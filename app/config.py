@@ -8,7 +8,7 @@ VERSION = "1.0.0"
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=("/etc/vexora/.env", ".env"), env_file_encoding="utf-8", extra="ignore")
     version: str = Field(VERSION, validation_alias="VEXORA_VERSION")
-    host: str = Field("127.0.0.1", validation_alias="VEXORA_HOST")
+    host: str = Field("0.0.0.0", validation_alias="VEXORA_HOST")
     port: int = Field(6000, validation_alias="VEXORA_PORT")
     public_host: str = Field("", validation_alias="VEXORA_PUBLIC_HOST")
     public_port: int = Field(8080, validation_alias="VEXORA_PUBLIC_PORT")
