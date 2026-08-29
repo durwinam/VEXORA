@@ -1,0 +1,35 @@
+{
+  "name": "VEXORA",
+  "version": "1.0.0",
+  "release": "commercial",
+  "backend": {
+    "host": "0.0.0.0",
+    "port": 6000,
+    "framework": "FastAPI/Uvicorn"
+  },
+  "public": {
+    "shop": "/shop/",
+    "admin": "/admin/",
+    "login": "/admin/login",
+    "health": "/health",
+    "http_8080": false,
+    "tls_required": true,
+    "primary_https_port": 443,
+    "alternate_https_port": "auto"
+  },
+  "database": "SQLite/WAL",
+  "certificate": {
+    "provider": "Let's Encrypt",
+    "domain_mode": "Certbot standalone HTTP-01",
+    "ip_mode": "Certbot ACME IP certificate support required",
+    "fake_certificate": false,
+    "required_for_success": true
+  },
+  "operations": [
+    "backup",
+    "restore",
+    "update",
+    "uninstall",
+    "diagnose"
+  ]
+}

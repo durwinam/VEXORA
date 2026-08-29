@@ -1,0 +1,8 @@
+VEXORA 1.0.0
+Release type: production-oriented clean build
+Public HTTP 8080: disabled
+Backend: 0.0.0.0:6000
+Public HTTPS: 443 + automatic alternate HTTPS port
+Admin: /admin/
+Shop: /shop/
+Certificate: mandatory

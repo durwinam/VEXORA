@@ -1,71 +1,33 @@
 # VEXORA 1.0.0
 
-Self-hosted RTL Persian configuration shop and management panel for VPS deployment and source distribution.
+VEXORA is a modular configuration shop with a protected administration panel.
 
-## Public routes
-- `/shop/` — customer storefront
-- `/admin/` — administrator dashboard
-- `/health` — local health endpoint
+## Routes
 
-## Included
-- Responsive RTL storefront and admin dashboard
-- SQLite database with WAL and audit records
-- Product/plan catalog, orders and receipt workflow
-- Panel registry with encrypted credentials and connectivity check
-- Signed admin sessions with bcrypt password hashing
-- Login rate limiting
-- Nginx reverse proxy with FastAPI bound to `0.0.0.0:6000`
-- HTTP on `8080` and HTTPS on `443` when a valid certificate is available
-- Let's Encrypt/Certbot certificate issuance and renewal hook
-- Domain certificates and supported IP certificates
-- Generated admin credentials and protected installation report
-- Daily automatic backups, manual backup and restore
-- Update command with source rollback on failed health checks
-- Health checks for application, Nginx and public routes
-- Management CLI: start, stop, restart, status, logs, health, version, backup, restore, update, uninstall
-- Local Persian fonts, SVG icons and emoji-friendly UI
-- Copyright attribution for `durwinam`
+- `/` redirects directly to `/shop/`.
+- `/shop/` is public.
+- `/admin/` requires authentication.
+- `/admin/login` is the administrator login.
+- `/health` is the local service health endpoint.
+
+## Runtime
+
+The Python application listens on `0.0.0.0:6000`.
+
+Public access is HTTPS-only through Nginx on port `443` and a second HTTPS port selected by the installer.
+
+Port `8080` is not used.
 
 ## Installation
 
-```bash
-curl -fsSL https://raw.githubusercontent.com/durwinam/VEXORA/main/install.sh -o /tmp/vexora-install.sh && sudo bash /tmp/vexora-install.sh
-```
+The installer creates `/etc/vexora/.env` automatically.
 
-The installer asks for public mode and domain/IP. Public routes are fixed: `/shop/` for customers and `/admin/` for administrators. It creates `/etc/vexora/.env` automatically and never requires `/etc/vexora/.env`.
+It does not require `.env.example` to exist.
 
-## Runtime paths
-- `/etc/vexora/.env` — runtime configuration and secret key (mode 600)
-- `/etc/vexora/INSTALLATION.txt` — installation summary (mode 600)
-- `/var/lib/vexora` — database, receipts and backups
-- `/var/log/vexora` — log directory
-- `/opt/vexora` — application source and virtual environment
+A valid public certificate is required before the installation is considered successful.
 
-## CLI
-```text
-vexora start
-vexora stop
-vexora restart
-vexora status
-vexora logs
-vexora health
-vexora version
-vexora backup
-vexora restore
-vexora update
-vexora uninstall
-```
+## Source style
 
-## Security model
-The application listens on `0.0.0.0:6000` for direct backend access; Nginx remains the public entry point for HTTP/HTTPS. Passwords are bcrypt-hashed, sessions are signed, login attempts are rate limited, uploads are size/type checked, and secrets are stored outside the web root.
+Project source is intentionally readable and modular.
 
-## Certificates
-Domain certificates use Let's Encrypt HTTP-01 through Certbot. IP address certificates require a recent Certbot release that supports the short-lived IP profile. If HTTPS cannot be activated, VEXORA remains available on HTTP `:8080` and the installer reports the exact certificate status instead of pretending HTTPS succeeded.
-
-## Network model
-
-VEXORA listens on `0.0.0.0:6000`, while the installer firewall policy blocks public TCP/6000. Public access is provided through Nginx on TCP/443 and TCP/8080.
-
-Fixed routes:
-- `/shop/` — customer storefront
-- `/admin/` — administration
+Python, HTML, CSS and shell files use normal multi-line formatting.
