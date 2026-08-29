@@ -1,3 +1,4 @@
+VEXORA_VERSION="1.0.0"
 #!/usr/bin/env bash
 
 set -euo pipefail
@@ -353,3 +354,6 @@ main() {
 }
 
 main "$@"
+
+# SSL target selection
+source "$SOURCE_ROOT/scripts/ssl-setup.sh"
