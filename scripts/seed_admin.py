@@ -2,7 +2,7 @@ from pathlib import Path
 from app.db import init_db, one, execute
 from app.security import hash_password
 
-CREDENTIAL_FILE = Path('/opt/vexora/first-login')
+CREDENTIAL_FILE = Path('/etc/vexora/first-login')
 
 
 def main() -> None:
