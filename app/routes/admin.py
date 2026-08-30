@@ -4,7 +4,7 @@ from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
 from app.auth import COOKIE_NAME, create_session, get_session
-from app.config import settings
+from app.config import APP_VERSION, settings
 from app.database import connect
 from app.security import verify_password
 
@@ -24,7 +24,7 @@ def render(request, template, **context):
         {
             "request": request,
             "username": current_user(request),
-            "version": settings.version,
+            "version": APP_VERSION,
             **context,
         },
     )
