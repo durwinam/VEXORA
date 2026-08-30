@@ -8,7 +8,6 @@ APP_VERSION = "1.0.0"
 
 @dataclass(frozen=True)
 class Settings:
-    version: str = APP_VERSION
     host: str = os.getenv("VEXORA_HOST", "0.0.0.0")
     port: int = int(os.getenv("VEXORA_PORT", "6000"))
     secret_key: str = os.getenv("VEXORA_SECRET_KEY", "")
